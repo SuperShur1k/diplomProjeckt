@@ -48,9 +48,6 @@ public class AvailableDateService {
     private AdminButtons adminButtons;
 
     @Autowired
-    private AutUserButtons autUserButtons;
-
-    @Autowired
     private UserRepository userRepository;
 
     public List<AvailableDate> getAvailableDatesForMaster(Long masterId) {
@@ -76,58 +73,6 @@ public class AvailableDateService {
         return timeSlotRepository.findTimeSlotsByAvailableDateId(availableDateId);
     }
 
-    public String addTimeSlot(Long availableDateId, LocalTime time, Master master, Long chatId) {
-        String languageCode = userRepository.findLanguageCodeByChatId(chatId);  // Получаем язык пользователя
-
-        AvailableDate availableDate = availableDateRepository.findById(availableDateId).orElse(null);
-        if (availableDate == null) {
-            if ("ru".equals(languageCode)) {
-                return "Дата не найдена.";
-            } else if ("uk".equals(languageCode)) {
-                return "Дата не знайдена.";
-            } else {
-                return "Available date not found.";
-            }
-        }
-
-        if (master == null) {
-            if ("ru".equals(languageCode)) {
-                return "Мастер не найден.";
-            } else if ("uk".equals(languageCode)) {
-                return "Майстра не знайдено.";
-            } else {
-                return "Master not found.";
-            }
-        }
-
-        TimeSlot timeSlot = new TimeSlot();
-        timeSlot.setAvailableDate(availableDate);
-        timeSlot.setMaster(master);
-        timeSlot.setTime(time);
-        timeSlot.setBooked(false);
-
-        timeSlotRepository.save(timeSlot);
-
-        if ("ru".equals(languageCode)) {
-            return "Временной слот успешно добавлен.";
-        } else if ("uk".equals(languageCode)) {
-            return "Часовий слот успішно додано.";
-        } else {
-            return "Time slot added successfully.";
-        }
-    }
-
-    public List<AvailableDate> getAvailableDatesForMasterWithSlots(Long masterId) {
-        // Получаем все доступные даты для мастера
-        List<AvailableDate> dates = availableDateRepository.findByMasterId(masterId);
-
-        // Фильтруем даты, чтобы оставить только те, у которых есть незабронированные временные слоты
-        return dates.stream()
-                .filter(date -> timeSlotRepository.findTimeSlotsByAvailableDateId(date.getId()).stream()
-                        .anyMatch(slot -> !slot.isBooked()))
-                .collect(Collectors.toList());
-    }
-
     public void initiateAddDate(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);  // Получаем язык пользователя
 
@@ -136,21 +81,13 @@ public class AvailableDateService {
 
         if (masters.isEmpty()) {
             // Если мастеров нет, отправляем сообщение пользователю
-            String noMastersMessage = "ru".equals(languageCode)
-                    ? "Нет доступных мастеров для добавления даты."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних майстрів для додавання дати."
-                    : "No available masters to add a date.";
+            String noMastersMessage = messageService.getLocalizedMessage("master.noAvailableMasters", languageCode);
             messageService.sendMessage(chatId, noMastersMessage);
             return;
         }
 
         // Формируем сообщение в зависимости от языка
-        String message = "ru".equals(languageCode)
-                ? "Выберите мастера для добавления даты:"
-                : "uk".equals(languageCode)
-                ? "Оберіть майстра для додавання дати:"
-                : "Select a master to add a date:";
+        String message = messageService.getLocalizedMessage("master.selectMasterForDate", languageCode);
 
         // Создаем кнопки для выбора мастера
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -164,7 +101,7 @@ public class AvailableDateService {
         }
 
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText("ru".equals(languageCode) ? "Отмена" : "uk".equals(languageCode) ? "Скасувати" : "Cancel");
+        cancelButton.setText(messageService.getLocalizedMessage("cancelButton", languageCode));  // Используем локализованное название кнопки
         cancelButton.setCallbackData("/cancel");
         rows.add(List.of(cancelButton));
 
@@ -183,11 +120,7 @@ public class AvailableDateService {
         String[] dateInfo = userSession.getDateInfo(chatId);
 
         if (dateInfo == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, начните процесс добавления даты снова, используя команду."
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, почніть процес додавання дати знову, використовуючи команду."
-                    : "Please start the add date process again by using the command.";
+            String message = messageService.getLocalizedMessage("dateProcess.startAgain", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -197,11 +130,7 @@ public class AvailableDateService {
             String masterId = input.split("_")[2];
             dateInfo[0] = masterId; // Сохраняем ID мастера
 
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, введите дату в формате YYYY-MM-DD:"
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, введіть дату у форматі YYYY-MM-DD:"
-                    : "Please enter the date in format YYYY-MM-DD:";
+            String message = messageService.getLocalizedMessage("dateProcess.enterDate", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -209,11 +138,7 @@ public class AvailableDateService {
         if (dateInfo[1] == null) {
             // Step 2: Ввод даты
             if (!input.matches("\\d{4}-\\d{2}-\\d{2}")) {
-                String message = "ru".equals(languageCode)
-                        ? "Неверный формат даты. Пожалуйста, введите корректную дату в формате YYYY-MM-DD:"
-                        : "uk".equals(languageCode)
-                        ? "Невірний формат дати. Будь ласка, введіть правильну дату у форматі YYYY-MM-DD:"
-                        : "Invalid date format. Please enter a valid date in format YYYY-MM-DD:";
+                String message = messageService.getLocalizedMessage("dateProcess.invalidFormat", languageCode);
                 messageService.sendMessage(chatId, message);
                 return;
             }
@@ -222,22 +147,14 @@ public class AvailableDateService {
             try {
                 date = LocalDate.parse(input);
             } catch (DateTimeParseException e) {
-                String message = "ru".equals(languageCode)
-                        ? "Неверный формат даты. Пожалуйста, введите корректную дату в формате YYYY-MM-DD:"
-                        : "uk".equals(languageCode)
-                        ? "Невірний формат дати. Будь ласка, введіть правильну дату у форматі YYYY-MM-DD:"
-                        : "Invalid date format. Please enter a valid date in format YYYY-MM-DD:";
+                String message = messageService.getLocalizedMessage("dateProcess.invalidFormat", languageCode);
                 messageService.sendMessage(chatId, message);
                 return;
             }
 
             // Проверка на добавление даты в прошлом
             if (date.isBefore(LocalDate.now())) {
-                String message = "ru".equals(languageCode)
-                        ? "Вы не можете добавить дату в прошлом. Пожалуйста, введите будущую дату."
-                        : "uk".equals(languageCode)
-                        ? "Ви не можете додати дату у минулому. Будь ласка, введіть майбутню дату."
-                        : "You cannot add a date in the past. Please enter a future date.";
+                String message = messageService.getLocalizedMessage("dateProcess.pastDate", languageCode);
                 messageService.sendMessage(chatId, message);
                 return;
             }
@@ -245,11 +162,7 @@ public class AvailableDateService {
             // Check if the date already exists for this master
             Long masterId = Long.parseLong(dateInfo[0]);
             if (findAvailableDateByMasterAndDate(masterId, date).isPresent()) {
-                String message = "ru".equals(languageCode)
-                        ? "Эта дата уже существует для мастера. Пожалуйста, введите другую дату или отмените процесс."
-                        : "uk".equals(languageCode)
-                        ? "Ця дата вже існує для майстра. Будь ласка, введіть іншу дату або скасуйте процес."
-                        : "This date already exists for the master. Please enter a different date or cancel the process.";
+                String message = messageService.getLocalizedMessage("dateProcess.dateExists", languageCode);
                 messageService.sendMessage(chatId, message);
             } else {
                 dateInfo[1] = date.toString();
@@ -260,12 +173,7 @@ public class AvailableDateService {
                 availableDate.setMaster(masterRepository.findById(masterId).orElse(null));
 
                 addAvailableDate(availableDate);
-                String message = "ru".equals(languageCode)
-                        ? "Дата успешно добавлена. Теперь вы можете добавить временные слоты для этой даты."
-                        : "uk".equals(languageCode)
-                        ? "Дата успішно додана. Тепер ви можете додати час для цієї дати."
-                        : "Date successfully added. You can now add time slots to this date.";
-
+                String message = messageService.getLocalizedMessage("dateProcess.success", languageCode);
                 messageService.sendMessage(chatId, message);
 
                 userSession.clearDateInfo(chatId);
@@ -279,17 +187,17 @@ public class AvailableDateService {
     }
 
     public void initiateAddTime(Long chatId) {
-        String languageCode = userRepository.findLanguageCodeByChatId(chatId); // Получаем язык пользователя
+        // Получаем язык пользователя
+        String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Пожалуйста, выберите мастера, для которого хотите добавить временной слот:"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, оберіть майстра, для якого хочете додати часовий слот:"
-                : "Please select the master for whom you want to add a time slot:";
+        // Получаем локализованное сообщение для подсказки пользователю
+        String message = messageService.getLocalizedMessage("addTime.selectMaster", languageCode);
 
-        List<Master> masters = masterRepository.findAll(); // Получаем список мастеров
+        // Получаем список мастеров
+        List<Master> masters = masterRepository.findAll();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Формируем кнопки для каждого мастера
         for (Master master : masters) {
             InlineKeyboardButton button = new InlineKeyboardButton();
             button.setText(master.getName()); // Устанавливаем имя мастера
@@ -297,16 +205,20 @@ public class AvailableDateService {
             rows.add(List.of(button));
         }
 
+        // Кнопка "Отмена" / "Скасувати" / "Cancel"
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText("ru".equals(languageCode) ? "Отмена" : "uk".equals(languageCode) ? "Скасувати" : "Cancel");
+        cancelButton.setText(messageService.getLocalizedMessage("general.cancel", languageCode));
         cancelButton.setCallbackData("/cancel");
         rows.add(List.of(cancelButton));
 
+        // Формируем клавиатуру с кнопками
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         keyboard.setKeyboard(rows);
 
+        // Отправляем сообщение с клавиатурой
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
 
+        // Инициализация сессии для хранения данных о мастере, дате и времени
         userSession.setTimeInfo(chatId, new String[3]); // Инициализация массива [мастер, дата, время]
         userSession.setPreviousState(chatId, "/add_time");
     }
@@ -316,11 +228,8 @@ public class AvailableDateService {
         String[] timeInfo = userSession.getTimeInfo(chatId);
 
         if (timeInfo == null) {
-            messageService.sendMessage(chatId, "ru".equals(languageCode)
-                    ? "Пожалуйста, начните процесс добавления времени снова."
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, почніть процес додавання часу знову."
-                    : "Please start the add time process again.");
+            String message = messageService.getLocalizedMessage("handle_add_time_start", languageCode);
+            messageService.sendMessage(chatId, message);
             return;
         }
 
@@ -331,11 +240,7 @@ public class AvailableDateService {
 
             log.info("Master ID {} успешно сохранен для чата {}", masterId, chatId);
 
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, выберите дату из доступных или введите вручную в формате YYYY-MM-DD:"
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, оберіть дату з доступних або введіть вручну у форматі YYYY-MM-DD:"
-                    : "Please select a date from the available options or enter it manually in format YYYY-MM-DD:";
+            String message = messageService.getLocalizedMessage("master_time_prompt", languageCode);
 
             List<AvailableDate> dates = availableDateRepository.findByMasterId(Long.valueOf(masterId)).stream()
                     .filter(date -> !date.getDate().isBefore(LocalDate.now())) // Remove past dates
@@ -343,11 +248,7 @@ public class AvailableDateService {
                     .collect(Collectors.toList());
 
             List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-            DateTimeFormatter formatter = "ru".equals(languageCode)
-                    ? DateTimeFormatter.ofPattern("dd MMMM yyyy", new Locale("ru"))
-                    : "uk".equals(languageCode)
-                    ? DateTimeFormatter.ofPattern("dd MMMM yyyy", new Locale("uk"))
-                    : DateTimeFormatter.ofPattern("MMMM dd, yyyy", Locale.ENGLISH);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.forLanguageTag(languageCode));
 
             for (AvailableDate date : dates) {
                 InlineKeyboardButton button = new InlineKeyboardButton();
@@ -367,22 +268,15 @@ public class AvailableDateService {
             timeInfo[1] = selectedDate;
             userSession.setTimeInfo(chatId, timeInfo);
 
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, введите время для слота в формате HH:MM:"
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, введіть час для слота у форматі HH:MM:"
-                    : "Please enter the time for the slot in format HH:MM:";
+            String message = messageService.getLocalizedMessage("date_time_prompt", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
         if (timeInfo[2] == null) {
             if (!input.matches("^([01]\\d|2[0-3]):[0-5]\\d$")) {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Неверный формат времени. Пожалуйста, введите время в формате HH:MM (от 00:00 до 23:59):"
-                        : "uk".equals(languageCode)
-                        ? "Невірний формат часу. Будь ласка, введіть час у форматі HH:MM (від 00:00 до 23:59):"
-                        : "Invalid time format. Please enter time in HH:MM format (between 00:00 and 23:59):");
+                String message = messageService.getLocalizedMessage("time_format_error", languageCode);
+                messageService.sendMessage(chatId, message);
                 return;
             }
 
@@ -393,12 +287,11 @@ public class AvailableDateService {
     }
 
     private void saveTimeSlot(Long chatId, String[] timeInfo) {
-        String userLanguage = userRepository.findLanguageCodeByChatId(chatId);
+        String languageCode = userRepository.findLanguageCodeByChatId(chatId); // Язык пользователя
         if (timeInfo[0] == null || timeInfo[1] == null || timeInfo[2] == null) {
             log.error("Некорректные данные timeInfo: {}", Arrays.toString(timeInfo));
-            messageService.sendMessage(chatId, userLanguage.equals("ru") ? "Ошибка: данные для сохранения слота некорректны." :
-                    userLanguage.equals("en") ? "Error: Data for saving the slot is incorrect." :
-                            "Помилка: дані для збереження слота некоректні.");
+            String errorMessage = messageService.getLocalizedMessage("time_info_error", languageCode);
+            messageService.sendMessage(chatId, errorMessage);
             return;
         }
 
@@ -409,18 +302,18 @@ public class AvailableDateService {
 
             log.info("Сохранение слота: мастер={}, дата={}, время={}", masterId, date, time);
 
-            Master master = masterRepository.findById(masterId).orElseThrow(() -> new RuntimeException( userLanguage.equals("ru") ? "Мастер не найден" :
-                    userLanguage.equals("en") ? "Master not found" :
-                            "Майстра не знайдено"));
+            Master master = masterRepository.findById(masterId).orElseThrow(() -> new RuntimeException(
+                    messageService.getLocalizedMessage("master_not_found", languageCode)
+            ));
+
             AvailableDate availableDate = availableDateRepository.findByMasterIdAndDate(masterId, date)
-                    .orElseThrow(() -> new RuntimeException(userLanguage.equals("ru") ? "Доступная дата не найдена" :
-                            userLanguage.equals("en") ? "Available date not found" :
-                                    "Доступну дату не знайдено"));
+                    .orElseThrow(() -> new RuntimeException(
+                            messageService.getLocalizedMessage("available_date_not_found", languageCode)
+                    ));
 
             if (timeSlotRepository.existsByAvailableDateAndTime(availableDate, time)) {
-                messageService.sendMessage(chatId,  userLanguage.equals("ru") ? "Временной слот уже существует." :
-                        userLanguage.equals("en") ? "The time slot already exists." :
-                                "Часовий слот уже існує.");
+                String message = messageService.getLocalizedMessage("time_slot_exists", languageCode);
+                messageService.sendMessage(chatId, message);
                 return;
             }
 
@@ -431,9 +324,10 @@ public class AvailableDateService {
             timeSlot.setMaster(master);
             timeSlotRepository.save(timeSlot);
 
-            messageService.sendMessage(chatId,  userLanguage.equals("ru") ? "Временной слот успешно добавлен!" :
-                    userLanguage.equals("en") ? "The time slot has been successfully added!" :
-                            "Часовий слот успішно додано!");
+            String successMessage = messageService.getLocalizedMessage("time_slot_added_success", languageCode);
+            messageService.sendMessage(chatId, successMessage);
+
+            // Очистка сессии и переход в меню
             userSession.clearDateInfo(chatId);
             userSession.clearStates(chatId);
             userSession.clearSession(chatId);
@@ -442,27 +336,17 @@ public class AvailableDateService {
             adminButtons.getDateInlineKeyboard(chatId, messageService);
         } catch (Exception e) {
             log.error("Ошибка при сохранении слота: ", e);
-            messageService.sendMessage(chatId, userLanguage.equals("ru") ? "Ошибка при добавлении временного слота. Попробуйте снова." :
-                    userLanguage.equals("en") ? "Error adding time slot. Please try again." :
-                            "Помилка при додаванні часовго слота. Спробуйте ще раз.");
+            String errorMessage = messageService.getLocalizedMessage("time_slot_add_error", languageCode);
+            messageService.sendMessage(chatId, errorMessage);
         }
     }
 
     public void initiateDeleteDate(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);  // Получаем язык пользователя
 
-        // Локализуем сообщение
-        String noMastersMessage = "ru".equals(languageCode)
-                ? "Нет доступных мастеров для удаления даты."
-                : "uk".equals(languageCode)
-                ? "Немає доступних майстрів для видалення дати."
-                : "No available masters to delete a date.";
-
-        String message = "ru".equals(languageCode)
-                ? "Пожалуйста, выберите мастера, для которого хотите удалить дату:"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, оберіть майстра, для якого хочете видалити дату:"
-                : "Please select the master for whom you want to delete a date:";
+        // Локализуем сообщения
+        String noMastersMessage = messageService.getLocalizedMessage("no_masters_for_delete_date", languageCode);
+        String message = messageService.getLocalizedMessage("select_master_for_delete_date", languageCode);
 
         // Получаем список мастеров
         List<Master> masters = masterRepository.findAll();
@@ -485,7 +369,7 @@ public class AvailableDateService {
 
         // Добавляем кнопку "Отмена"
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText("ru".equals(languageCode) ? "Отмена" : "uk".equals(languageCode) ? "Скасувати" : "Cancel");
+        cancelButton.setText(messageService.getLocalizedMessage("cancel", languageCode));
         cancelButton.setCallbackData("/cancel");
         rows.add(List.of(cancelButton));
 
@@ -504,11 +388,7 @@ public class AvailableDateService {
         String[] deleteDateInfo = userSession.getDateInfo(chatId);
 
         if (deleteDateInfo == null) {
-            messageService.sendMessage(chatId, "ru".equals(languageCode)
-                    ? "Пожалуйста, начните процесс удаления даты снова, используя команду."
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, почніть процес видалення дати знову, використовуючи команду."
-                    : "Please start the delete date process again by using the command.");
+            messageService.sendMessage(chatId, messageService.getLocalizedMessage("start_delete_date_process", languageCode));
             return;
         }
 
@@ -522,19 +402,11 @@ public class AvailableDateService {
                     .stream().sorted(Comparator.comparing(AvailableDate::getDate)).toList();
 
             if (dates.isEmpty()) {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Нет доступных дат для удаления."
-                        : "uk".equals(languageCode)
-                        ? "Немає доступних дат для видалення."
-                        : "No available dates for deletion.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("no_available_dates_for_deletion", languageCode));
                 return;
             }
 
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, выберите дату из доступных:"
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, оберіть дату з доступних:"
-                    : "Please select a date from the available options:";
+            String message = messageService.getLocalizedMessage("select_date_for_deletion", languageCode);
 
             List<List<InlineKeyboardButton>> rows = new ArrayList<>();
             for (AvailableDate date : dates) {
@@ -562,20 +434,16 @@ public class AvailableDateService {
 
                 if (!timeSlots.isEmpty()) {
                     // Если есть временные ячейки, запрашиваем подтверждение
-                    String confirmationMessage = "ru".equals(languageCode)
-                            ? "Для этой даты существуют временные ячейки. Вы хотите удалить дату вместе с временными ячейками?"
-                            : "uk".equals(languageCode)
-                            ? "Для цієї дати існують часові слоти. Ви хочете видалити дату разом із часовими слотами?"
-                            : "This date has associated time slots. Do you want to delete the date along with the time slots?";
+                    String confirmationMessage = messageService.getLocalizedMessage("confirmation_delete_date_with_time_slots", languageCode);
 
                     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
                     InlineKeyboardButton confirmButton = new InlineKeyboardButton();
-                    confirmButton.setText("ru".equals(languageCode) ? "Да, удалить" : "uk".equals(languageCode) ? "Так, видалити" : "Yes, delete");
+                    confirmButton.setText(messageService.getLocalizedMessage("confirm_delete", languageCode));
                     confirmButton.setCallbackData("/confirmDeleteDate_" + availableDate.getId());
 
                     InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-                    cancelButton.setText("ru".equals(languageCode) ? "Отмена" : "uk".equals(languageCode) ? "Скасувати" : "Cancel");
+                    cancelButton.setText(messageService.getLocalizedMessage("cancel", languageCode));
                     cancelButton.setCallbackData("/cancel");
 
                     rows.add(List.of(confirmButton));
@@ -587,11 +455,7 @@ public class AvailableDateService {
                 } else {
                     // Удаление даты, если нет временных ячеек
                     deleteAvailableDate(availableDate);
-                    messageService.sendMessage(chatId, "ru".equals(languageCode)
-                            ? "Дата " + date + " была удалена для мастера " + availableDate.getMaster().getName() + "."
-                            : "uk".equals(languageCode)
-                            ? "Дата " + date + " була видалена для майстра " + availableDate.getMaster().getName() + "."
-                            : "Date " + date + " has been deleted for master " + availableDate.getMaster().getName() + ".");
+                    messageService.sendMessage(chatId, messageService.getLocalizedMessage("date_deleted", languageCode, date, availableDate.getMaster().getName()));
                     userSession.clearDateInfo(chatId);
                     userSession.clearStates(chatId);
                     userSession.clearSession(chatId);
@@ -600,11 +464,7 @@ public class AvailableDateService {
                     adminButtons.getDateInlineKeyboard(chatId, messageService);
                 }
             } else {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Нет доступной даты для указанного мастера и даты."
-                        : "uk".equals(languageCode)
-                        ? "Немає доступної дати для вказаного майстра і дати."
-                        : "No available date found for the specified master and date.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("no_available_date_for_master", languageCode));
             }
         } else if (input.startsWith("/confirmDeleteDate_")) {
             // Подтверждение удаления даты и временных слотов
@@ -614,11 +474,7 @@ public class AvailableDateService {
             if (availableDateOpt.isPresent()) {
                 AvailableDate availableDate = availableDateOpt.get();
                 deleteAvailableDate(availableDate); // Метод, который удаляет дату и связанные слоты
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Дата и связанные временные слоты были удалены."
-                        : "uk".equals(languageCode)
-                        ? "Дата та пов'язані часові слоти були видалені."
-                        : "The date and associated time slots have been deleted.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("date_and_time_slots_deleted", languageCode));
                 userSession.clearDateInfo(chatId);
                 userSession.clearStates(chatId);
                 userSession.clearSession(chatId);
@@ -626,19 +482,11 @@ public class AvailableDateService {
                 userSession.setPreviousState(chatId, "/admin");
                 adminButtons.getDateInlineKeyboard(chatId, messageService);
             } else {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Дата уже была удалена или недоступна."
-                        : "uk".equals(languageCode)
-                        ? "Дата вже була видалена або недоступна."
-                        : "The date has already been deleted or is unavailable.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("date_already_deleted_or_unavailable", languageCode));
             }
         } else if ("/cancel".equals(input)) {
             // Отмена операции
-            messageService.sendMessage(chatId, "ru".equals(languageCode)
-                    ? "Операция отменена."
-                    : "uk".equals(languageCode)
-                    ? "Операцію скасовано."
-                    : "Operation cancelled.");
+            messageService.sendMessage(chatId, messageService.getLocalizedMessage("operation_cancelled", languageCode));
             userSession.clearDateInfo(chatId);
         }
     }
@@ -647,17 +495,9 @@ public class AvailableDateService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId); // Получаем язык пользователя
 
         // Локализуем сообщение
-        String noMastersMessage = "ru".equals(languageCode)
-                ? "Нет доступных мастеров для удаления временных слотов."
-                : "uk".equals(languageCode)
-                ? "Немає доступних майстрів для видалення часових слотів."
-                : "No available masters to delete time slots.";
+        String noMastersMessage = messageService.getLocalizedMessage("no_masters_for_delete_time", languageCode);
 
-        String message = "ru".equals(languageCode)
-                ? "Пожалуйста, выберите мастера, для которого хотите удалить временной слот:"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, оберіть майстра, для якого хочете видалити часовий слот:"
-                : "Please select the master for whom you want to delete a time slot:";
+        String message = messageService.getLocalizedMessage("select_master_for_delete_time", languageCode);
 
         // Получаем список мастеров
         List<Master> masters = masterRepository.findAll();
@@ -679,7 +519,7 @@ public class AvailableDateService {
 
         // Добавляем кнопку "Отмена"
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText("ru".equals(languageCode) ? "Отмена" : "uk".equals(languageCode) ? "Скасувати" : "Cancel");
+        cancelButton.setText(messageService.getLocalizedMessage("cancel", languageCode));
         cancelButton.setCallbackData("/cancel");
         rows.add(List.of(cancelButton));
 
@@ -698,12 +538,7 @@ public class AvailableDateService {
         String[] deleteTimeInfo = userSession.getTimeInfo(chatId);
 
         if (deleteTimeInfo == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, начните процесс удаления времени снова, используя команду."
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, почніть процес видалення часу знову, використовуючи команду."
-                    : "Please start the delete time process again by using the command.";
-            messageService.sendMessage(chatId, message);
+            messageService.sendMessage(chatId, messageService.getLocalizedMessage("start_delete_time_process", languageCode));
             return;
         }
 
@@ -718,19 +553,11 @@ public class AvailableDateService {
                     .toList();
 
             if (dates.isEmpty()) {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "У выбранного мастера нет доступных дат."
-                        : "uk".equals(languageCode)
-                        ? "У вибраного майстра немає доступних дат."
-                        : "The selected master has no available dates.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("no_available_dates_for_deletion", languageCode));
                 return;
             }
 
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, выберите дату из доступных:"
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, оберіть дату з доступних:"
-                    : "Please select a date from the available options:";
+            String message = messageService.getLocalizedMessage("select_date_for_deletion", languageCode);
 
             List<List<InlineKeyboardButton>> rows = new ArrayList<>();
             for (AvailableDate date : dates) {
@@ -758,19 +585,11 @@ public class AvailableDateService {
                 AvailableDate availableDate = availableDateOpt.get();
                 List<TimeSlot> timeSlots = getTimeSlotsForAvailableDate(availableDate.getId());
                 if (timeSlots.isEmpty()) {
-                    messageService.sendMessage(chatId, "ru".equals(languageCode)
-                            ? "Нет временных слотов для выбранной даты."
-                            : "uk".equals(languageCode)
-                            ? "Немає часових слотів для обраної дати."
-                            : "No time slots available for the selected date.");
+                    messageService.sendMessage(chatId, messageService.getLocalizedMessage("no_time_slots_for_date", languageCode));
                     return;
                 }
 
-                String message = "ru".equals(languageCode)
-                        ? "Пожалуйста, выберите время для удаления:"
-                        : "uk".equals(languageCode)
-                        ? "Будь ласка, оберіть час для видалення:"
-                        : "Please select a time to delete:";
+                String message = messageService.getLocalizedMessage("select_time_for_deletion", languageCode);
 
                 List<List<InlineKeyboardButton>> rows = new ArrayList<>();
                 for (TimeSlot slot : timeSlots) {
@@ -784,11 +603,7 @@ public class AvailableDateService {
                 keyboard.setKeyboard(rows);
                 messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
             } else {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Нет доступной даты для указанного мастера."
-                        : "uk".equals(languageCode)
-                        ? "Немає доступної дати для вказаного майстра."
-                        : "No available date found for the specified master.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("no_available_date_for_master", languageCode));
                 userSession.clearTimeInfo(chatId);
                 userSession.clearStates(chatId);
                 userSession.clearSession(chatId);
@@ -817,11 +632,7 @@ public class AvailableDateService {
 
                 if (timeSlotOpt.isPresent()) {
                     timeSlotRepository.delete(timeSlotOpt.get());
-                    messageService.sendMessage(chatId, "ru".equals(languageCode)
-                            ? "Временной слот " + time + " на " + date + " был удален."
-                            : "uk".equals(languageCode)
-                            ? "Часовий слот " + time + " на " + date + " був видалений."
-                            : "Time slot " + time + " on " + date + " has been deleted.");
+                    messageService.sendMessage(chatId, messageService.getLocalizedMessage("time_slot_deleted", languageCode, time, date));
                     userSession.clearTimeInfo(chatId);
                     userSession.clearStates(chatId);
                     userSession.clearSession(chatId);
@@ -829,11 +640,7 @@ public class AvailableDateService {
                     userSession.setPreviousState(chatId, "/admin");
                     adminButtons.getDateInlineKeyboard(chatId, messageService);
                 } else {
-                    messageService.sendMessage(chatId, "ru".equals(languageCode)
-                            ? "Не найдено временного слота для указанного времени."
-                            : "uk".equals(languageCode)
-                            ? "Не знайдено часовий слот для вказаного часу."
-                            : "No time slot found for the specified time.");
+                    messageService.sendMessage(chatId, messageService.getLocalizedMessage("time_slot_not_found", languageCode));
                     userSession.clearTimeInfo(chatId);
                     userSession.clearStates(chatId);
                     userSession.clearSession(chatId);
@@ -842,11 +649,7 @@ public class AvailableDateService {
                     adminButtons.getDateInlineKeyboard(chatId, messageService);
                 }
             } else {
-                messageService.sendMessage(chatId, "ru".equals(languageCode)
-                        ? "Нет доступной даты для указанного мастера."
-                        : "uk".equals(languageCode)
-                        ? "Немає доступної дати для вказаного майстра."
-                        : "No available date found for the specified master.");
+                messageService.sendMessage(chatId, messageService.getLocalizedMessage("no_available_date_for_master", languageCode));
             }
         }
     }

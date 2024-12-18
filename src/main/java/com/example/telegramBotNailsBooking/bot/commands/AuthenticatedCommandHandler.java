@@ -4,6 +4,7 @@ import com.example.telegramBotNailsBooking.model.Appointment;
 import com.example.telegramBotNailsBooking.model.Services;
 import com.example.telegramBotNailsBooking.model.UserSession;
 import com.example.telegramBotNailsBooking.model.Users;
+import com.example.telegramBotNailsBooking.repository.AppointmentRepository;
 import com.example.telegramBotNailsBooking.repository.MasterRepository;
 import com.example.telegramBotNailsBooking.repository.ServiceRepository;
 import com.example.telegramBotNailsBooking.repository.UserRepository;
@@ -58,10 +59,14 @@ public class AuthenticatedCommandHandler extends UserService {
 
     @Autowired
     private ServiceManagementService serviceManagementService;
+
     @Autowired
     private MasterRepository masterRepository;
+
     @Autowired
     private MasterService masterService;
+    @Autowired
+    private AppointmentRepository appointmentRepository;
 
     public void handleAuthenticatedCommand(Long chatId, String text, Update update) {
 
@@ -76,25 +81,18 @@ public class AuthenticatedCommandHandler extends UserService {
             userSession.setCurrentState(chatId, "/master_record_client");
             userSession.setPreviousState(chatId, "/master");
 
-            String message = "ru".equals(languageCode)
-                    ? "Введите номер телефона клиента:" :
-                    "uk".equals(languageCode)
-                            ? "Введіть номер телефону клієнта:" :
-                            "Enter the client's phone number:";
-
-            // Отправляем сообщение с кнопкой "Отмена"
+            // Локализованная кнопка "Отмена"
             InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
             List<List<InlineKeyboardButton>> rows = new ArrayList<>();
             InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode) ? "Отмена" :
-                            "uk".equals(languageCode) ? "Скасувати" :
-                                    "Cancel"
+                    messageService.getLocalizedMessage("button.cancel", languageCode)
             );
             cancelButton.setCallbackData("/master_cancel_appointment_master");
             rows.add(List.of(cancelButton));
             keyboard.setKeyboard(rows);
 
-            messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+            // Отправка сообщения с кнопкой
+            messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "client.phone.prompt", languageCode, keyboard);
             return;
         }
 
@@ -107,37 +105,26 @@ public class AuthenticatedCommandHandler extends UserService {
                 userSession.setCurrentState(chatId, "/master_select_master");
                 userSession.setTempData(chatId, "userId", String.valueOf(existingUser.getId()));
 
-                String message = "ru".equals(languageCode)
-                        ? "Клиент найден. Выберите услугу для записи:" :
-                        "uk".equals(languageCode)
-                                ? "Клієнт знайдений. Оберіть послугу для запису:" :
-                                "Client found. Choose a service for the appointment:";
-                messageService.sendMessage(chatId, message);
+                // Локализованное сообщение для найденного клиента
+                messageService.sendLocalizedMessage(chatId, "client.found.choose.service", languageCode);
                 masterService.showServiceSelection(chatId);
             } else {
                 // Клиент не найден
                 userSession.setCurrentState(chatId, "/master_add_new_client");
                 userSession.setTempData(chatId, "phone", phoneNumber);
 
-                String message = "ru".equals(languageCode)
-                        ? "Клиент не найден. Введите имя клиента:" :
-                        "uk".equals(languageCode)
-                                ? "Клієнт не знайдений. Введіть ім'я клієнта:" :
-                                "Client not found. Enter the client's first name:";
-
-                // Отправляем сообщение с кнопкой "Отмена"
+                // Локализованная кнопка "Отмена"
                 InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
                 List<List<InlineKeyboardButton>> rows = new ArrayList<>();
                 InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                        "ru".equals(languageCode) ? "Отмена" :
-                                "uk".equals(languageCode) ? "Скасувати" :
-                                        "Cancel"
+                        messageService.getLocalizedMessage("button.cancel", languageCode)
                 );
                 cancelButton.setCallbackData("/master_cancel_appointment_master");
                 rows.add(List.of(cancelButton));
                 keyboard.setKeyboard(rows);
 
-                messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+                // Отправка сообщения с кнопкой
+                messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "client.not.found.enter.name", languageCode, keyboard);
             }
             return;
         }
@@ -147,14 +134,13 @@ public class AuthenticatedCommandHandler extends UserService {
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/master");
 
-            String message = "ru".equals(languageCode)
-                    ? "Процесс записи отменен." :
-                    "uk".equals(languageCode)
-                            ? "Процес запису скасовано." :
-                            "Appointment process canceled.";
-
-            // Возвращаемся в меню управления записями
-            messageService.sendMessageWithInlineKeyboard(chatId, message, autUserButtons.masterPanel(chatId));
+            // Локализованное сообщение об отмене процесса записи
+            messageService.sendLocalizedMessageWithInlineKeyboard(
+                    chatId,
+                    "appointment.process.canceled", // ключ для локализации
+                    languageCode,
+                    autUserButtons.masterPanel(chatId)
+            );
             return;
         }
 
@@ -163,12 +149,9 @@ public class AuthenticatedCommandHandler extends UserService {
             userSession.setTempData(chatId, "firstName", firstName);
 
             userSession.setCurrentState(chatId, "/master_add_new_client_last_name");
-            String message = "ru".equals(languageCode)
-                    ? "Введите фамилию клиента:" :
-                    "uk".equals(languageCode)
-                            ? "Введіть прізвище клієнта:" :
-                            "Enter the client's last name:";
-            messageService.sendMessage(chatId, message);
+
+            // Локализованное сообщение
+            messageService.sendLocalizedMessage(chatId, "client.enter.last.name", languageCode);
             return;
         }
 
@@ -189,12 +172,8 @@ public class AuthenticatedCommandHandler extends UserService {
             userSession.setCurrentState(chatId, "/master_select_master");
             userSession.setTempData(chatId, "userId", String.valueOf(newUser.getId()));
 
-            String message = "ru".equals(languageCode)
-                    ? "Новый клиент добавлен. Выберите услугу:" :
-                    "uk".equals(languageCode)
-                            ? "Новий клієнт доданий. Оберіть послугу:" :
-                            "New client added. Choose a service:";
-            messageService.sendMessage(chatId, message);
+            // Локализованное сообщение
+            messageService.sendLocalizedMessage(chatId, "client.added.choose.service", languageCode);
             masterService.showServiceSelection(chatId);
             return;
         }
@@ -225,21 +204,16 @@ public class AuthenticatedCommandHandler extends UserService {
             return;
         }
 
-
-
         if (text.equals("/master") && masterRepository.existsByChatId(chatId)) {
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/master");
             userSession.setPreviousState(chatId, "/main_menu");
 
-            String message = "ru".equals(languageCode)
-                    ? "Добро пожаловать в панель мастера. Выберите действие:"
-                    : "uk".equals(languageCode)
-                    ? "Ласкаво просимо до панелі майстра. Оберіть дію:"
-                    : "Welcome to the master panel. Please select an action:";
-
-            // Отправляем сообщение с панелью мастера
-            messageService.sendMessageWithInlineKeyboard(chatId, message, autUserButtons.masterPanel(chatId));
+            // Локализованное сообщение
+            messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                    "master.panel.welcome",
+                    languageCode,
+                    autUserButtons.masterPanel(chatId));
             return;
         }
 
@@ -262,8 +236,8 @@ public class AuthenticatedCommandHandler extends UserService {
             return;
         }
 
-        if (text.startsWith("/appointment_details_") && masterRepository.existsByChatId(chatId)) {
-            String[] parts = text.replace("/appointment_details_", "").split("_");
+        if (text.startsWith("/master_appointment_details_") && masterRepository.existsByChatId(chatId)) {
+            String[] parts = text.replace("/master_appointment_details_", "").split("_");
             LocalDate date = LocalDate.parse(parts[0]);
             LocalTime time = LocalTime.parse(parts[1]);
             userSession.clearStates(chatId);
@@ -318,6 +292,11 @@ public class AuthenticatedCommandHandler extends UserService {
             return;
         }
 
+        if (text.equals("/master_write_client")){
+            masterService.initialWriteToClient(chatId);
+            return;
+        }
+
         if (text.startsWith("/message_client_")){
             Long clientChatId = Long.parseLong(text.replace("/message_client_", ""));
             userSession.clearStates(chatId);
@@ -357,7 +336,7 @@ public class AuthenticatedCommandHandler extends UserService {
             return;
         }
 
-        if (currentState == null) {
+        if (currentState == (null)) {
             currentState = "/main_menu"; // Устанавливаем значение по умолчанию
             userSession.setCurrentState(chatId, currentState);
         }
@@ -394,15 +373,9 @@ public class AuthenticatedCommandHandler extends UserService {
 
                 messageService.sendMessage(chatId, serviceName + ": " + serviceDescription);
             } else {
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Описание услуги не найдено.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Опис послуги не знайдено.";
-                } else {
-                    message = "Service description not found.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "service.description.not.found",
+                        languageCode);
             }
             return;
         }
@@ -410,20 +383,15 @@ public class AuthenticatedCommandHandler extends UserService {
         if (currentState.startsWith("/awaiting_phone_")) {
             String phoneNumber = update.getMessage().getText();
             String language = currentState.split("_")[2];
+
             if (isValidPhoneNumber(phoneNumber)) {
                 String[] userInfo = userSession.getUserInfo(chatId);
 
                 // Проверяем, есть ли номер телефона уже в базе
                 if (userRepository.existsByPhoneNumber(phoneNumber)) {
-                    String message;
-                    if ("ru".equals(language)) {
-                        message = "Ошибка: этот номер телефона уже зарегистрирован.";
-                    } else if ("uk".equals(language)) {
-                        message = "Помилка: цей номер телефону вже зареєстрований.";
-                    } else {
-                        message = "Error: this phone number is already registered.";
-                    }
-                    messageService.sendMessage(chatId, message);
+                    messageService.sendLocalizedMessage(chatId,
+                            "error.phone.already.registered",
+                            language);
                     return;
                 } else {
                     // Создаем и сохраняем нового пользователя
@@ -436,15 +404,9 @@ public class AuthenticatedCommandHandler extends UserService {
                 }
             } else {
                 // Номер телефона некорректный
-                String message;
-                if ("ru".equals(language)) {
-                    message = "Ошибка: введите корректный номер телефона. Номер должен начинаться с '+', содержать только цифры и быть длиной от 10 до 15 символов.";
-                } else if ("uk".equals(language)) {
-                    message = "Помилка: введіть правильний номер телефону. Номер має починатися з '+', містити лише цифри та мати довжину від 10 до 15 символів.";
-                } else {
-                    message = "Error: please enter a valid phone number. The number must start with '+', contain only digits, and be 10 to 15 characters long.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "error.phone.invalid",
+                        language);
                 return;
             }
         }
@@ -461,7 +423,7 @@ public class AuthenticatedCommandHandler extends UserService {
             return;
         }
 
-        if (currentState == "/select_master") {
+        if (currentState.equals("/select_master")) {
             handleAuthenticatedCommand(chatId, "/select_master", update);
             return;
         }
@@ -507,15 +469,9 @@ public class AuthenticatedCommandHandler extends UserService {
 
                 messageService.sendMessage(chatId, serviceName + ": " + serviceDescription);
             } else {
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Описание услуги не найдено.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Опис послуги не знайдено.";
-                } else {
-                    message = "Service description not found.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "error.service.description.not.found",
+                        languageCode);
             }
             return;
         }
@@ -526,15 +482,9 @@ public class AuthenticatedCommandHandler extends UserService {
                 String[] parts = text.replace("/show_times_", "").split("_");
 
                 if (parts.length < 2) {
-                    String message;
-                    if ("ru".equals(languageCode)) {
-                        message = "Неверный формат команды. Пожалуйста, попробуйте снова.";
-                    } else if ("uk".equals(languageCode)) {
-                        message = "Невірний формат команди. Будь ласка, спробуйте ще раз.";
-                    } else {
-                        message = "Invalid command format. Please try again.";
-                    }
-                    messageService.sendMessage(chatId, message);
+                    messageService.sendLocalizedMessage(chatId,
+                            "error.command.invalid.format",
+                            languageCode);
                     return;
                 }
 
@@ -545,26 +495,14 @@ public class AuthenticatedCommandHandler extends UserService {
                 appointmentService.showTimeSlotsForDate(chatId, date, status);
                 return;
             } catch (DateTimeParseException e) {
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Неверный формат даты. Пожалуйста, попробуйте снова.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Невірний формат дати. Будь ласка, спробуйте ще раз.";
-                } else {
-                    message = "Invalid date format. Please try again.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "error.date.invalid.format",
+                        languageCode);
                 return;
             } catch (IllegalArgumentException e) {
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Неверный формат статуса. Пожалуйста, попробуйте снова.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Невірний формат статусу. Будь ласка, спробуйте ще раз.";
-                } else {
-                    message = "Invalid status format. Please try again.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "error.status.invalid.format",
+                        languageCode);
                 return;
             }
         }
@@ -589,12 +527,9 @@ public class AuthenticatedCommandHandler extends UserService {
                 appointmentService.cancelAppointment(chatId, appointmentId);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Пожалуйста, выберите дату и время для отмены записи."
-                                : "uk".equals(languageCode)
-                                ? "Будь ласка, оберіть дату та час для скасування запису."
-                                : "Please choose date and time for canceling the appointment.");
+                messageService.sendLocalizedMessage(chatId,
+                        "appointment.cancel.prompt",
+                        languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -606,17 +541,10 @@ public class AuthenticatedCommandHandler extends UserService {
                 appointmentService.transferAppointment(chatId, appointmentId);
                 return;
             } else {
+                messageService.sendLocalizedMessage(chatId,
+                        "appointment.transfer.select.date.time",
+                        languageCode);
 
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Пожалуйста, выберите дату и время для переноса записи.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Будь ласка, виберіть дату та час для переносу запису.";
-                } else {
-                    message = "Please choose date and time for transfer appointment.";
-                }
-
-                messageService.sendMessage(chatId, message);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -642,15 +570,7 @@ public class AuthenticatedCommandHandler extends UserService {
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
 
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Ваша запись не была перенесена.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Ваша запис не була перенесена.";
-                } else {
-                    message = "Your appointment was not transferred.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId, "appointment.not.transferred", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             } else if (userSession.getCurrentState(chatId).startsWith("/confirm_cancel_")) {
@@ -659,15 +579,7 @@ public class AuthenticatedCommandHandler extends UserService {
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
 
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Ваша запись не была отменена.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Ваша запис не була скасована.";
-                } else {
-                    message = "Your appointment was not canceled.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId, "appointment.not.canceled", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             } else if (userSession.getCurrentState(chatId).startsWith("/confirm_delete_")) {
@@ -676,15 +588,7 @@ public class AuthenticatedCommandHandler extends UserService {
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
 
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Ваша запись не была удалена.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Ваша запис не була видалена.";
-                } else {
-                    message = "Your appointment was not deleted.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId, "appointment.not.deleted", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             } else if (userSession.getCurrentState(chatId).startsWith("/confirm_review_")) {
@@ -693,15 +597,7 @@ public class AuthenticatedCommandHandler extends UserService {
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
 
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Мы ждем ваш отзыв в будущем.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Ми чекаємо на ваш відгук в майбутньому.";
-                } else {
-                    message = "We look forward to your review in the future.";
-                }
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId, "review.waiting.future", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -716,17 +612,11 @@ public class AuthenticatedCommandHandler extends UserService {
                 appointmentService.finalizeTransfer(chatId, appointmentId, timeSlotId);
                 return;
             } else {
+                // Использование локализации
+                messageService.sendLocalizedMessage(chatId,
+                        "appointment.transfer.choose.datetime",
+                        languageCode);
 
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Пожалуйста, выберите дату и время для переноса записи.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Будь ласка, виберіть дату та час для переносу запису.";
-                } else {
-                    message = "Please choose date and time for transfer appointment.";
-                }
-
-                messageService.sendMessage(chatId, message);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -747,17 +637,9 @@ public class AuthenticatedCommandHandler extends UserService {
                 appointmentService.deleteAppointment(chatId, appointmentId);
                 return;
             } else {
-
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Пожалуйста, выберите дату и время для удаления записи.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Будь ласка, виберіть дату та час для видалення запису.";
-                } else {
-                    message = "Please choose date and time for delete appointment.";
-                }
-
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "appointment.delete.select.date.time",
+                        languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -774,27 +656,18 @@ public class AuthenticatedCommandHandler extends UserService {
         if (text.startsWith("/review_appointment_")) {
             if (userSession.getCurrentState(chatId).startsWith("/confirm_review_")) {
                 Long appointmentId = Long.parseLong(text.split("_")[2]);
-
                 reviewService.askMarkAndFeedback(chatId, appointmentId);
                 return;
             } else {
-
-                String message;
-                if ("ru".equals(languageCode)) {
-                    message = "Пожалуйста, выберите дату и время для оставления отзыва о записи.";
-                } else if ("uk".equals(languageCode)) {
-                    message = "Будь ласка, виберіть дату та час для відгуку про запис.";
-                } else {
-                    message = "Please choose date and time for review appointment.";
-                }
-
-                messageService.sendMessage(chatId, message);
+                messageService.sendLocalizedMessage(chatId,
+                        "review.appointment.choose.date.time",
+                        languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
         }
 
-        if (userSession.getCurrentState(chatId) == "/waiting_for_rating_") {
+        if (userSession.getCurrentState(chatId).equals("/waiting_for_rating_")) {
             int rating = Integer.parseInt(text);
             reviewService.requestComment(chatId, rating);
             return;
@@ -1012,70 +885,55 @@ public class AuthenticatedCommandHandler extends UserService {
 
         switch (text) {
             case "/lang_ru":
-                if (currentState == "/start") {
-                    messageService.sendMessage(chatId, "Здравствуйте! Добро пожаловать в наш бот для записи на процедуры." +
-                            " Здесь вы можете легко записаться на нужную услугу." +
-                            " Следуйте подсказкам, и мы поможем вам пройти процесс записи. Начнем!");
+                if (currentState.equals("/start")) {
+                    messageService.sendLocalizedMessage(chatId, "welcome.message.ru", "ru");
                     personalData(chatId, "ru");
-                    break;
-                } else if (currentState == "/choose_lang") {
+                } else if (currentState.equals("/choose_lang")) {
                     changeLanguage(chatId, "ru");
-                    break;
                 } else {
-                    messageService.sendMessage(chatId, "Извините, команда не распознана. Введите /help, чтобы увидеть доступные команды.");
+                    messageService.sendLocalizedMessage(chatId, "command.not.recognized", "ru");
 
                     if (currentState != null) {
-                        // Переходим к предыдущему состоянию
                         handleAuthenticatedCommand(chatId, currentState, update);
                     } else {
-                        // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-                        messageService.sendMessageWithInlineKeyboard(chatId, "Предыдущее состояние не найдено. Возвращение в главное меню.", autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+                        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                                "previous.state.not.found", "ru", autUserButtons.getAuthenticatedInlineKeyboard(chatId));
                     }
                 }
                 break;
 
             case "/lang_en":
-                if (currentState == "/start") {
-                    messageService.sendMessage(chatId, "Hello! Welcome to our appointment booking bot. " +
-                            "Here, you can easily schedule an appointment for your desired service. " +
-                            "Simply follow the prompts, and we’ll guide you through the booking process. Let's get started!");
+                if (currentState.equals("/start")) {
+                    messageService.sendLocalizedMessage(chatId, "welcome.message.en", "en");
                     personalData(chatId, "en");
-                    break;
-                } else if (currentState == "/choose_lang") {
+                } else if (currentState.equals("/choose_lang")) {
                     changeLanguage(chatId, "en");
-                    break;
                 } else {
-                    messageService.sendMessage(chatId, "Sorry, command was not recognized. Type /help for available commands.");
+                    messageService.sendLocalizedMessage(chatId, "command.not.recognized", "en");
 
                     if (currentState != null) {
-                        // Переходим к предыдущему состоянию
                         handleAuthenticatedCommand(chatId, currentState, update);
                     } else {
-                        // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-                        messageService.sendMessageWithInlineKeyboard(chatId, "No previous state found. Returning to the main menu.", autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+                        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                                "previous.state.not.found", "en", autUserButtons.getAuthenticatedInlineKeyboard(chatId));
                     }
                 }
                 break;
 
             case "/lang_uk":
                 if (currentState.equals("/start")) {
-                    messageService.sendMessage(chatId, "Привіт! Вітаємо у нашому боті для запису на процедури." +
-                            " Тут ви зможете легко записатися на бажану послугу." +
-                            " Просто дотримуйтесь підказок, і ми допоможемо вам пройти процес запису. Почнемо!");
+                    messageService.sendLocalizedMessage(chatId, "welcome.message.uk", "uk");
                     personalData(chatId, "uk");
-                    break;
-                } else if (currentState == "/choose_lang") {
+                } else if (currentState.equals("/choose_lang")) {
                     changeLanguage(chatId, "uk");
-                    break;
                 } else {
-                    messageService.sendMessage(chatId, "Вибачте, команду не розпізнано. Введіть /help, щоб побачити доступні команди.");
+                    messageService.sendLocalizedMessage(chatId, "command.not.recognized", "uk");
 
                     if (currentState != null) {
-                        // Переходим к предыдущему состоянию
                         handleAuthenticatedCommand(chatId, currentState, update);
                     } else {
-                        // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-                        messageService.sendMessageWithInlineKeyboard(chatId, "Попередній стан не знайдено. Повернення в головне меню.", autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+                        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                                "previous.state.not.found", "uk", autUserButtons.getAuthenticatedInlineKeyboard(chatId));
                     }
                 }
                 break;
@@ -1129,10 +987,10 @@ public class AuthenticatedCommandHandler extends UserService {
 
             case "/cancel_appointment":
                 userSession.clearBookingInfo(chatId);
-                messageService.sendMessage(chatId, "ru".equals(languageCode) ? "Запись была отменена." :
-                        "uk".equals(languageCode) ? "Запис було скасовано." :
-                                "Booking has been canceled.");
-                menuService.bookingManagerButton(chatId, messageService);
+                messageService.sendLocalizedMessage(chatId,
+                        "appointment.canceled",
+                        languageCode);
+                menuService.bookingManagerButton(chatId);
                 break;
             case "/select_master":
                 appointmentService.selectMaster(chatId);
@@ -1163,58 +1021,58 @@ public class AuthenticatedCommandHandler extends UserService {
             case "/back":
                 goBack(chatId);
                 break;
-
             case "/menu":
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/menu");
                 userSession.setPreviousState(chatId, "/main_menu");
-                messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Вот ваше меню:" :
-                                "uk".equals(languageCode) ? "Ось ваше меню:" :
-                                        "Here is your menu:",
+                messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                        "menu.title",
+                        languageCode,
                         menuService.getMenuInlineKeyboard(chatId));
                 break;
-
             case "/settings":
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/settings");
                 userSession.setPreviousState(chatId, "/menu");
-                menuService.handleSettingsCommand(chatId, messageService);
+                menuService.handleSettingsCommand(chatId);
                 break;
-
             case "/cancel":
                 cancel(chatId);
                 break;
-
             case "/book_service":
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/book_service");
                 userSession.setPreviousState(chatId, "/menu");
-                menuService.bookingManagerButton(chatId, messageService);
+                menuService.bookingManagerButton(chatId);
                 break;
-
             case "/book":
                 appointmentService.startBooking(chatId);
-                messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Вы можете отменить эту операцию, используя кнопку ниже." :
-                                "uk".equals(languageCode) ? "Ви можете скасувати цю операцію, використовуючи кнопку нижче." :
-                                        "You can cancel this operation using the button below.",
+                messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                        "appointment.start.prompt",
+                        languageCode,
                         autUserButtons.getCancelInlineKeyboard(chatId));
                 break;
             default:
                 if (text.contains("/")) {
-                    messageService.sendMessage(chatId, "ru".equals(languageCode) ? "Извините, команда не распознана. Введите /help для доступных команд." :
-                            "uk".equals(languageCode) ? "Вибачте, команда не розпізнана. Введіть /help для доступних команд." :
-                                    "Sorry, command was not recognized. Type /help for available commands.");
+                    messageService.sendLocalizedMessage(chatId,
+                            "command.not.recognized",
+                            languageCode);
                     break;
                 }
 
                 if (userSession.getPreviousState(chatId) != null) {
                     // Переходим к предыдущему состоянию
                     handleAuthenticatedCommand(chatId, userSession.getPreviousState(chatId), update);
+                    break;
                 } else {
+                    userSession.clearStates(chatId);
+                    userSession.setPreviousState(chatId, "/main_menu");
+                    userSession.setCurrentState(chatId, "/main_menu");
+
                     // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-                    messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Предыдущего состояния не найдено. Возвращаем в главное меню." :
-                                    "uk".equals(languageCode) ? "Попереднього стану не знайдено. Повертаємо до головного меню." :
-                                            "No previous state found. Returning to the main menu.",
+                    messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                            "previous.state.not.found",
+                            languageCode,
                             autUserButtons.getAuthenticatedInlineKeyboard(chatId));
                 }
                 break;
@@ -1225,9 +1083,7 @@ public class AuthenticatedCommandHandler extends UserService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
         String currentState = userSession.getCurrentState(chatId); // Получаем предыдущее состояние
-        messageService.sendMessage(chatId, "ru".equals(languageCode) ? "Текущая операция была отменена." :
-                "uk".equals(languageCode) ? "Поточна операція була скасована." :
-                        "Current operation has been cancelled.");
+        messageService.sendLocalizedMessage(chatId, "operation.cancelled", languageCode);
 
         if (currentState != null) {
             // Если предыдущее состояние существует, возвращаемся к нему и устанавливаем его как текущее
@@ -1256,10 +1112,12 @@ public class AuthenticatedCommandHandler extends UserService {
             handleAuthenticatedCommand(chatId, previousState, new Update());
         } else {
             // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-            messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Предыдущего состояния не найдено. Возвращаем в главное меню." :
-                            "uk".equals(languageCode) ? "Попереднього стану не знайдено. Повертаємо до головного меню." :
-                                    "No previous state found. Returning to the main menu.",
-                    autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            messageService.sendLocalizedMessageWithInlineKeyboard(
+                    chatId,
+                    "previous.state.not.found",
+                    languageCode,
+                    autUserButtons.getAuthenticatedInlineKeyboard(chatId)
+            );
         }
     }
 
@@ -1267,9 +1125,9 @@ public class AuthenticatedCommandHandler extends UserService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/main_menu");
-        messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Главное меню" :
-                        "uk".equals(languageCode) ? "Головне меню" :
-                                "Main Menu",
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                "main.menu",
+                languageCode,
                 autUserButtons.getAuthenticatedInlineKeyboard(chatId));
     }
 }

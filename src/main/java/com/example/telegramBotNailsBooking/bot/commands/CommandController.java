@@ -213,6 +213,15 @@ public class CommandController {
         } else if (command.startsWith("/master_time_master_")){
             authenticatedCommandHandler.handleAuthenticatedCommand(chatId, command, update);
             return;
+        } else if (command.equals("/master_write_client")) {
+            authenticatedCommandHandler.handleAuthenticatedCommand(chatId, command, update);
+            return;
+        } else if (command.startsWith("/master_appointment_details_")) {
+            authenticatedCommandHandler.handleAuthenticatedCommand(chatId, command, update);
+            return;
+        } else if (command.equals("/admin_cancel_appointment")) {
+            adminCommandHandler.handleAdminCommand(chatId, command);
+            return;
         }
 
         String currentState = userSession.getCurrentState(chatId);

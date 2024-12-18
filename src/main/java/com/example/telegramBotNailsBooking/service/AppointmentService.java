@@ -65,11 +65,10 @@ public class AppointmentService {
 
     public void selectMaster(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-        messageService.sendMessage(chatId, "ru".equals(languageCode)
-                ? "Выберите мастера для записи на прием."
-                : "uk".equals(languageCode)
-                ? "Оберіть майстра для запису на прийом."
-                : "Choose a master to book an appointment.");
+
+        // Локализуем сообщение о выборе мастера
+        String message = messageService.getLocalizedMessage("master.select", languageCode);
+        messageService.sendMessage(chatId, message);
 
         for (Master master : masterRepository.findAllByStatus(Master.Status.ACTIVE)) {
             // Получаем все доступные даты для мастера
@@ -83,13 +82,8 @@ public class AppointmentService {
 
             // Если нет свободных дат, отправляем сообщение с номером телефона мастера
             if (availableDates.isEmpty()) {
-                String message = "ru".equals(languageCode)
-                        ? "У мастера " + master.getName() + " в настоящее время нет доступных дат. Пожалуйста, свяжитесь с ним по телефону: " + master.getPhoneNumber()
-                        : "uk".equals(languageCode)
-                        ? "У майстра " + master.getName() + " зараз немає доступних дат. Будь ласка, зв'яжіться з ним за телефоном: " + master.getPhoneNumber()
-                        : "Master " + master.getName() + " currently has no available dates. Please contact them at: " + master.getPhoneNumber();
-
-                messageService.sendMessage(chatId, message);
+                String noDatesMessage = messageService.getLocalizedMessage("master.no_available_dates", languageCode, master.getName(), master.getPhoneNumber());
+                messageService.sendMessage(chatId, noDatesMessage);
                 continue;
             }
 
@@ -102,13 +96,11 @@ public class AppointmentService {
             InlineKeyboardButton masterButton = new InlineKeyboardButton();
             masterButton.setText(master.getName());
             masterButton.setCallbackData("/select_date_" + master.getId());
-
             buttons.add(masterButton);
 
             // Кнопка для ссылки на соцсети мастера
             InlineKeyboardButton socialButton = new InlineKeyboardButton();
-            socialButton.setText("ru".equals((languageCode)) ? "Социальная сеть"
-                    : "uk".equals(languageCode) ? "Соціальна мережа" : "Social Link");
+            socialButton.setText(messageService.getLocalizedMessage("master.social_link", languageCode));
             socialButton.setUrl(master.getSocialLink());
             buttons.add(socialButton);
 
@@ -119,6 +111,7 @@ public class AppointmentService {
             messageService.sendMessageWithInlineKeyboard(chatId, master.getDescription(), keyboardMarkup);
         }
 
+        // Обновляем сессию пользователя
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/book_service");
         userSession.setPreviousState(chatId, "/menu");
@@ -128,13 +121,9 @@ public class AppointmentService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         String masterIdString = userSession.getSelectedMaster(chatId);
         if (masterIdString == null) {
-            messageService.sendMessage(chatId,
-                    "ru".equals(languageCode)
-                            ? "Сначала вам нужно выбрать мастера."
-                            : "uk".equals(languageCode)
-                            ? "Спочатку вам потрібно обрати майстра."
-                            : "You need to select a master first."
-            );
+            // Локализуем сообщение, если мастер не выбран
+            String message = messageService.getLocalizedMessage("date.select_master_first", languageCode);
+            messageService.sendMessage(chatId, message);
             return;
         }
 
@@ -148,12 +137,8 @@ public class AppointmentService {
                 .collect(Collectors.toList());
 
         if (dates.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Нет доступных дат для выбранного мастера."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних дат для обраного майстра."
-                    : "No available dates for the selected master.";
-
+            // Локализуем сообщение, если нет доступных дат
+            String message = messageService.getLocalizedMessage("date.no_available_dates", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -176,14 +161,9 @@ public class AppointmentService {
 
         keyboard.setKeyboard(rows);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату:"
-                : "Select a date:";
-
+        // Локализуем сообщение для выбора даты
+        String message = messageService.getLocalizedMessage("date.select_date", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
-
     }
 
     public void selectTime(Long chatId) {
@@ -191,12 +171,8 @@ public class AppointmentService {
 
         String dateIdString = userSession.getSelectedDate(chatId);
         if (dateIdString == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Сначала нужно выбрать дату."
-                    : "uk".equals(languageCode)
-                    ? "Спочатку потрібно обрати дату."
-                    : "You need to select a date first.";
-
+            // Локализуем сообщение, если дата не выбрана
+            String message = messageService.getLocalizedMessage("time.select_date_first", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -216,12 +192,8 @@ public class AppointmentService {
 
         keyboard.setKeyboard(rows);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите время:"
-                : "uk".equals(languageCode)
-                ? "Оберіть час:"
-                : "Select a time:";
-
+        // Локализуем сообщение для выбора времени
+        String message = messageService.getLocalizedMessage("time.select_time", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -230,12 +202,8 @@ public class AppointmentService {
 
         String masterIdString = userSession.getSelectedMaster(chatId);
         if (masterIdString == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Сначала нужно выбрать мастера."
-                    : "uk".equals(languageCode)
-                    ? "Спочатку потрібно обрати майстра."
-                    : "You need to select a master first.";
-
+            // Локализуем сообщение, если мастер не выбран
+            String message = messageService.getLocalizedMessage("service.select_master_first", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -247,37 +215,29 @@ public class AppointmentService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         for (Services service : services) {
-            // Кнопка для выбора услуги с названием и ценой
-            InlineKeyboardButton selectButton = new InlineKeyboardButton("ru".equals(languageCode) ? service.getNameRu() :
-                    "uk".equals(languageCode) ? service.getNameUk() :
-                            service.getNameEn());
+            // Локализуем название услуги с ценой
+            InlineKeyboardButton selectButton = new InlineKeyboardButton(messageService.getLocalizedServiceName(service, languageCode));
             selectButton.setCallbackData("/select_service_" + service.getId());
 
+            // Кнопка для отображения цены
             InlineKeyboardButton priceButton = new InlineKeyboardButton(service.getPrice() + "€ ↑ ↑");
             priceButton.setCallbackData("/select_service_" + service.getId());
 
-            // Кнопка для отображения описания услуги
+            // Локализуем текст кнопки "Описание услуги"
             InlineKeyboardButton descriptionButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode)
-                            ? "↑ ↑ Описание"
-                            : "uk".equals(languageCode)
-                            ? "↑ ↑ Опис"
-                            : "↑ ↑ Description"
+                    messageService.getLocalizedMessage("service.description", languageCode)
             );
             descriptionButton.setCallbackData("/show_description_" + service.getId());
 
-            // Добавляем обе кнопки на одну строку
+            // Добавляем кнопки на одну строку
             rows.add(List.of(selectButton));
             rows.add(List.of(descriptionButton, priceButton));
         }
 
         keyboard.setKeyboard(rows);
-        String message = "ru".equals(languageCode)
-                ? "Выберите услугу:"
-                : "uk".equals(languageCode)
-                ? "Оберіть послугу:"
-                : "Select a service:";
 
+        // Локализуем сообщение о выборе услуги
+        String message = messageService.getLocalizedMessage("service.select_service", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -300,58 +260,38 @@ public class AppointmentService {
         Services service = serviceRepository.findById(serviceId).orElse(null);
 
         if (master == null || date == null || timeSlot == null || service == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Произошла ошибка при получении данных бронирования. Пожалуйста, попробуйте еще раз."
-                    : "uk".equals(languageCode)
-                    ? "Виникла помилка під час отримання даних для бронювання. Будь ласка, спробуйте ще раз."
-                    : "An error occurred while retrieving booking details. Please try again.";
-
-            messageService.sendMessage(chatId, message);
+            // Локализуем сообщение об ошибке при получении данных
+            String errorMessage = messageService.getLocalizedMessage("booking.error", languageCode);
+            messageService.sendMessage(chatId, errorMessage);
             return;
         }
 
-        // Show booking details for confirmation
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы собираетесь записаться на прием к:\n" +
-                "Мастер: " + master.getName() + "\n" +
-                "Услуга: " + service.getNameRu() + " - " + service.getPrice() + "€\n" +
-                "Дата: " + date.getDate() + "\n" +
-                "Время: " + timeSlot.getTime() + "\n\n" +
-                "Вы уверены, что хотите подтвердить эту запись?"
-                : "uk".equals(languageCode)
-                ? "Ви збираєтеся записатися на прийом до:\n" +
-                "Майстер: " + master.getName() + "\n" +
-                "Послуга: " + service.getNameUk() + " - " + service.getPrice() + "€\n" +
-                "Дата: " + date.getDate() + "\n" +
-                "Час: " + timeSlot.getTime() + "\n\n" +
-                "Ви впевнені, що хочете підтвердити цей запис?"
-                : "You are about to book an appointment with:\n" +
-                "Master: " + master.getName() + "\n" +
-                "Service: " + service.getNameEn() + " - " + service.getPrice() + "€\n" +
-                "Date: " + date.getDate() + "\n" +
-                "Time: " + timeSlot.getTime() + "\n\n" +
-                "Are you sure you want to confirm this booking?";
+        // Локализуем сообщение с деталями бронирования
+        String confirmationMessage = messageService.getLocalizedMessage(
+                "booking.confirmation", languageCode,
+                master.getName(),
+                messageService.getLocalizedServiceName(service, languageCode),
+                service.getPrice(),
+                date.getDate(),
+                timeSlot.getTime()
+        );
 
-        // Inline keyboard with Yes and No options
+        // Создаем клавиатуру с кнопками "Да" и "Нет"
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        InlineKeyboardButton yesButton = new InlineKeyboardButton("ru".equals(languageCode)
-                ? "Да"
-                : "uk".equals(languageCode)
-                ? "Так"
-                : "Yes");
-        yesButton.setCallbackData("/confirm_appointment"); // callback for confirmation
+        InlineKeyboardButton yesButton = new InlineKeyboardButton(
+                messageService.getLocalizedMessage("booking.yes", languageCode)
+        );
+        yesButton.setCallbackData("/confirm_appointment"); // callback для подтверждения
 
-        InlineKeyboardButton noButton = new InlineKeyboardButton("ru".equals(languageCode)
-                ? "Нет"
-                : "uk".equals(languageCode)
-                ? "Ні"
-                : "No");
-        noButton.setCallbackData("/cancel_appointment"); // callback for cancellation
+        InlineKeyboardButton noButton = new InlineKeyboardButton(
+                messageService.getLocalizedMessage("booking.no", languageCode)
+        );
+        noButton.setCallbackData("/cancel_appointment"); // callback для отмены
 
         List<InlineKeyboardButton> row = List.of(yesButton, noButton);
         keyboard.setKeyboard(List.of(row));
 
-        // Send confirmation message with inline keyboard
+        // Отправляем сообщение с подтверждением и клавиатурой
         messageService.sendMessageWithInlineKeyboard(chatId, confirmationMessage, keyboard);
     }
 
@@ -361,53 +301,33 @@ public class AppointmentService {
         Long timeSlotId = Long.valueOf(userSession.getSelectedTimeSlot(chatId));
         Long serviceId = Long.valueOf(userSession.getSelectedService(chatId));
 
+        // Создаем запись
         createAppointment(chatId, masterId, dateId, timeSlotId, serviceId);
 
-        // Отправка уведомления мастеру
+        // Уведомление для мастера
         Master master = masterRepository.findById(masterId).orElse(null);
         if (master != null && master.getChatId() != null) {
             String languageCodeMaster = userRepository.findLanguageCodeByChatId(master.getChatId());
 
-            Users users = userRepository.findByChatId(chatId);
-            String clientName = users != null ? users.getFirstName() + " " + users.getLastName() : "Unknown";
-            String serviceName = serviceRepository.findById(serviceId)
-                    .map(service -> {
-                        if ("ru".equals(languageCodeMaster)) {
-                            return service.getNameRu();
-                        } else if ("uk".equals(languageCodeMaster)) {
-                            return service.getNameUk();
-                        } else {
-                            return service.getNameEn();
-                        }
-                    })
-                    .orElse("Unknown");
+            Users client = userRepository.findByChatId(chatId);
+            String clientName = client != null ? client.getFirstName() + " " + client.getLastName() : "Unknown";
+
+            Services service = serviceRepository.findById(serviceId).orElse(null);
+            String serviceName = service != null ? messageService.getLocalizedServiceName(service, languageCodeMaster) : "Unknown";
+
             LocalDate appointmentDate = availableDateRepository.findById(dateId).map(AvailableDate::getDate).orElse(LocalDate.MIN);
             LocalTime appointmentTime = timeSlotRepository.findById(timeSlotId).map(TimeSlot::getTime).orElse(LocalTime.MIDNIGHT);
 
-            String notification = "ru".equals(languageCodeMaster)
-                    ? "Новая запись на прием:\n" +
-                    "Клиент: " + clientName + "\n" +
-                    "Услуга: " + serviceName + "\n" +
-                    "Дата: " + appointmentDate + "\n" +
-                    "Время: " + appointmentTime
-                    : "uk".equals(languageCodeMaster)
-                    ? "Нове бронювання:\n" +
-                    "Клієнт: " + clientName + "\n" +
-                    "Послуга: " + serviceName + "\n" +
-                    "Дата: " + appointmentDate + "\n" +
-                    "Час: " + appointmentTime
-                    : "New appointment booked:\n" +
-                    "Client: " + clientName + "\n" +
-                    "Service: " + serviceName + "\n" +
-                    "Date: " + appointmentDate + "\n" +
-                    "Time: " + appointmentTime;
+            // Локализуем уведомление
+            String notification = messageService.getLocalizedMessage("booking.master.notification", languageCodeMaster,
+                    clientName, serviceName, appointmentDate, appointmentTime);
 
+            // Отправляем уведомление мастеру
             messageService.sendMessage(master.getChatId(), notification);
         } else {
             log.warn("Failed to notify master: Master ID {} does not have a chat ID", masterId);
         }
     }
-
 
     public void createAppointment(Long chatId, Long masterId, Long dateId, Long timeSlotId, Long serviceId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
@@ -419,14 +339,9 @@ public class AppointmentService {
         TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId).orElse(null);
 
         if (users == null || master == null || service == null || date == null || timeSlot == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Не удалось создать запись. Недействительные данные."
-                    : "uk".equals(languageCode)
-                    ? "Не вдалося створити запис. Недійсні дані."
-                    : "Failed to create appointment. Invalid data.";
-
-            messageService.sendMessage(chatId, message);
-            menuService.bookingManagerButton(chatId, messageService);
+            String errorMessage = messageService.getLocalizedMessage("appointment.create.error", languageCode);
+            messageService.sendMessage(chatId, errorMessage);
+            menuService.bookingManagerButton(chatId);
             return;
         }
 
@@ -442,14 +357,9 @@ public class AppointmentService {
         timeSlot.setBooked(true);
         timeSlotRepository.save(timeSlot);
 
-        String message = "ru".equals(languageCode)
-                ? "Запись успешно создана!"
-                : "uk".equals(languageCode)
-                ? "Запис успішно створено!"
-                : "Appointment successfully booked!";
-
-        messageService.sendMessage(chatId, message);
-        menuService.bookingManagerButton(chatId, messageService);
+        String successMessage = messageService.getLocalizedMessage("appointment.create.success", languageCode);
+        messageService.sendMessage(chatId, successMessage);
+        menuService.bookingManagerButton(chatId);
     }
 
     public void showBookingsByStatus(Long chatId, Appointment.Status status) {
@@ -459,12 +369,7 @@ public class AppointmentService {
         List<Appointment> appointments = appointmentRepository.findByChatIdAndStatus(chatId, status);
 
         if (appointments.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Бронирования со статусом: " + status + " не найдены."
-                    : "uk".equals(languageCode)
-                    ? "Бронювання зі статусом: " + status + " не знайдено."
-                    : "No bookings found with status: " + status;
-
+            String message = messageService.getLocalizedMessage("booking.status.notFound", languageCode, status);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -490,11 +395,7 @@ public class AppointmentService {
         // Добавляем кнопки навигации
         List<InlineKeyboardButton> navigationButtons = new ArrayList<>();
         InlineKeyboardButton backButton = new InlineKeyboardButton(
-                "ru".equals(languageCode)
-                        ? "Назад"
-                        : "uk".equals(languageCode)
-                        ? "Назад"
-                        : "Back"
+                messageService.getLocalizedMessage("button.back", languageCode)
         );
         backButton.setCallbackData("/back");
         navigationButtons.add(backButton);
@@ -502,12 +403,8 @@ public class AppointmentService {
         rows.add(navigationButtons);
 
         keyboard.setKeyboard(rows);
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату, чтобы просмотреть доступные временные слоты:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату, щоб переглянути доступні часові слоти:"
-                : "Select a date to view available time slots:";
 
+        String message = messageService.getLocalizedMessage("booking.selectDate", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -521,12 +418,7 @@ public class AppointmentService {
                 .collect(Collectors.toList());
 
         if (appointments.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Нет доступных временных слотов для выбранной даты."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних часових слотів для обраної дати."
-                    : "No time slots available for the selected date.";
-
+            String message = messageService.getLocalizedMessage("timeSlots.noAvailable", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -541,25 +433,19 @@ public class AppointmentService {
             rows.add(List.of(timeButton));
         }
 
+        // Добавляем кнопку "Назад"
         List<InlineKeyboardButton> navigationButtons = new ArrayList<>();
-        InlineKeyboardButton backButton = new InlineKeyboardButton("ru".equals(languageCode)
-                ? "Назад"
-                : "uk".equals(languageCode)
-                ? "Назад"
-                : "Back");
+        InlineKeyboardButton backButton = new InlineKeyboardButton(
+                messageService.getLocalizedMessage("button.back", languageCode)
+        );
         backButton.setCallbackData("/back");
         navigationButtons.add(backButton);
         rows.add(navigationButtons);
 
-
         userSession.setCurrentState(chatId, "/show_times_" + date + "_" + status);
         keyboard.setKeyboard(rows);
-        String message = "ru".equals(languageCode)
-                ? "Выберите временной слот, чтобы просмотреть детали бронирования:"
-                : "uk".equals(languageCode)
-                ? "Оберіть часовий слот, щоб переглянути деталі бронювання:"
-                : "Select a time slot to view booking details:";
 
+        String message = messageService.getLocalizedMessage("timeSlots.selectSlot", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -569,123 +455,56 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Бронирование не найдено."
-                    : "uk".equals(languageCode)
-                    ? "Бронювання не знайдено."
-                    : "Booking not found.";
+            String message = messageService.getLocalizedMessage("booking.notFound", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
         if (appointment.getServices() == null || appointment.getMaster() == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Неполные данные бронирования."
-                    : "uk".equals(languageCode)
-                    ? "Неповні дані бронювання."
-                    : "Incomplete booking details.";
+            String message = messageService.getLocalizedMessage("booking.incomplete", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-        String serviceName = "ru".equals(languageCode)
-                ? appointment.getServices().getNameRu()
-                : "uk".equals(languageCode)
-                ? appointment.getServices().getNameUk()
-                : appointment.getServices().getNameEn();
+        String serviceName = messageService.getLocalizedServiceName(appointment.getServices(), languageCode);
 
         StringBuilder details = new StringBuilder();
-        details.append("ru".equals(languageCode)
-                        ? "Услуга: "
-                        : "uk".equals(languageCode)
-                        ? "Послуга: "
-                        : "Service: ")
-                .append(serviceName).append("\n")
-                .append("ru".equals(languageCode)
-                        ? "Мастер: "
-                        : "uk".equals(languageCode)
-                        ? "Майстер: "
-                        : "Master: ")
-                .append(appointment.getMaster().getName()).append("\n")
-                .append("ru".equals(languageCode)
-                        ? "Цена: "
-                        : "uk".equals(languageCode)
-                        ? "Ціна: "
-                        : "Price: ")
-                .append(appointment.getServices().getPrice()).append("€\n")
-                .append("ru".equals(languageCode)
-                        ? "Дата: "
-                        : "uk".equals(languageCode)
-                        ? "Дата: "
-                        : "Date: ")
-                .append(appointment.getAppointmentDate().toLocalDate()).append("\n")
-                .append("ru".equals(languageCode)
-                        ? "Время: "
-                        : "uk".equals(languageCode)
-                        ? "Час: "
-                        : "Time: ")
-                .append(appointment.getAppointmentDate().toLocalTime());
+        details.append(messageService.getLocalizedMessage("booking.service", languageCode)).append(serviceName).append("\n")
+                .append(messageService.getLocalizedMessage("booking.master", languageCode)).append(appointment.getMaster().getName()).append("\n")
+                .append(messageService.getLocalizedMessage("booking.price", languageCode)).append(appointment.getServices().getPrice()).append("€\n")
+                .append(messageService.getLocalizedMessage("booking.date", languageCode)).append(appointment.getAppointmentDate().toLocalDate()).append("\n")
+                .append(messageService.getLocalizedMessage("booking.time", languageCode)).append(appointment.getAppointmentDate().toLocalTime());
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-// Если статус записи - CONFIRMED, добавляем кнопки отмены и переноса
-        if (appointment.getStatus() == Appointment.Status.CONFIRMED) {
-            InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode)
-                            ? "Отменить запись"
-                            : "uk".equals(languageCode)
-                            ? "Скасувати запис"
-                            : "Cancel Appointment"
-            );
+        // Если статус записи - CONFIRMED, добавляем кнопки отмены и переноса
+        if (appointment.getStatus().equals(Appointment.Status.CONFIRMED)) {
+            InlineKeyboardButton cancelButton = new InlineKeyboardButton(messageService.getLocalizedMessage("booking.cancel", languageCode));
             cancelButton.setCallbackData("/confirm_cancel_" + appointmentId);
             rows.add(List.of(cancelButton));
 
-            InlineKeyboardButton transferButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode)
-                            ? "Перенести запись"
-                            : "uk".equals(languageCode)
-                            ? "Перенести запис"
-                            : "Transfer Appointment"
-            );
+            InlineKeyboardButton transferButton = new InlineKeyboardButton(messageService.getLocalizedMessage("booking.transfer", languageCode));
             transferButton.setCallbackData("/confirm_transfer_" + appointmentId);
             rows.add(List.of(transferButton));
         }
 
-// Если статус записи не CONFIRMED, добавляем кнопку удаления
-        if (appointment.getStatus() != Appointment.Status.CONFIRMED) {
-            InlineKeyboardButton deleteButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode)
-                            ? "Удалить запись"
-                            : "uk".equals(languageCode)
-                            ? "Видалити запис"
-                            : "Delete Appointment"
-            );
+        // Если статус записи не CONFIRMED, добавляем кнопку удаления
+        if (!appointment.getStatus().equals(Appointment.Status.CONFIRMED)) {
+            InlineKeyboardButton deleteButton = new InlineKeyboardButton(messageService.getLocalizedMessage("booking.delete", languageCode));
             deleteButton.setCallbackData("/confirm_delete_" + appointmentId);
             rows.add(List.of(deleteButton));
         }
 
-// Если статус записи - COMPLETED, добавляем кнопку для отзыва
-        if (appointment.getStatus() == Appointment.Status.COMPLETED) {
-            InlineKeyboardButton reviewButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode)
-                            ? "Оставить отзыв"
-                            : "uk".equals(languageCode)
-                            ? "Залишити відгук"
-                            : "Review Appointment"
-            );
+        // Если статус записи - COMPLETED, добавляем кнопку для отзыва
+        if (appointment.getStatus().equals(Appointment.Status.COMPLETED)) {
+            InlineKeyboardButton reviewButton = new InlineKeyboardButton(messageService.getLocalizedMessage("booking.review", languageCode));
             reviewButton.setCallbackData("/confirm_review_" + appointmentId);
             rows.add(List.of(reviewButton));
         }
 
-// Кнопка "Назад"
-        InlineKeyboardButton backButton = new InlineKeyboardButton(
-                "ru".equals(languageCode)
-                        ? "Назад"
-                        : "uk".equals(languageCode)
-                        ? "Назад"
-                        : "Back"
-        );
+        // Кнопка "Назад"
+        InlineKeyboardButton backButton = new InlineKeyboardButton(messageService.getLocalizedMessage("button.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
@@ -698,44 +517,19 @@ public class AppointmentService {
 
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.notFound", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы уверены, что хотите удалить эту запись: "
-                + appointment.getAppointmentDate().toLocalDate() + " "
-                + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "uk".equals(languageCode)
-                ? "Ви впевнені, що хочете видалити цей запис: "
-                + appointment.getAppointmentDate().toLocalDate() + " "
-                + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "Are you sure you want to delete this appointment: "
-                + appointment.getAppointmentDate().toLocalDate() + " "
-                + appointment.getAppointmentDate().toLocalTime() + "?";
+        String confirmationMessage = messageService.getLocalizedMessage("appointment.confirmDelete", languageCode,
+                appointment.getAppointmentDate().toLocalDate(), appointment.getAppointmentDate().toLocalTime());
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        InlineKeyboardButton yesButton = new InlineKeyboardButton(
-                "ru".equals(languageCode)
-                        ? "Да, удалить запись"
-                        : "uk".equals(languageCode)
-                        ? "Так, видалити запис"
-                        : "Yes, Delete Appointment"
-        );
+        InlineKeyboardButton yesButton = new InlineKeyboardButton(messageService.getLocalizedMessage("appointment.deleteYes", languageCode));
         yesButton.setCallbackData("/delete_appointment_" + appointmentId);
 
-        InlineKeyboardButton noButton = new InlineKeyboardButton(
-                "ru".equals(languageCode)
-                        ? "Нет, оставить"
-                        : "uk".equals(languageCode)
-                        ? "Ні, залишити"
-                        : "No, keep"
-        );
+        InlineKeyboardButton noButton = new InlineKeyboardButton(messageService.getLocalizedMessage("appointment.deleteNo", languageCode));
         noButton.setCallbackData("/keep_appointment");
 
         List<InlineKeyboardButton> row = List.of(yesButton, noButton);
@@ -749,19 +543,11 @@ public class AppointmentService {
 
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.notFound", languageCode);
             messageService.sendMessage(chatId, message);
             return;
-        } else if (appointment.getStatus() == Appointment.Status.CONFIRMED) {
-            String message = "ru".equals(languageCode)
-                    ? "Вы можете удалять записи со статусом ЗАВЕРШЕНО или ОТМЕНЕНО."
-                    : "uk".equals(languageCode)
-                    ? "Ви можете видаляти записи зі статусом ЗАВЕРШЕНО або СКАСОВАНО."
-                    : "You can delete appointments with status COMPLETED or CANCELLED.";
+        } else if (appointment.getStatus().equals(Appointment.Status.CONFIRMED)) {
+            String message = messageService.getLocalizedMessage("appointment.deleteNotAllowed", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -792,11 +578,7 @@ public class AppointmentService {
 
         appointmentRepository.delete(appointment);
 
-        String deleteMessage = "ru".equals(languageCode)
-                ? "Запись удалена."
-                : "uk".equals(languageCode)
-                ? "Запис видалено."
-                : "Appointment deleted.";
+        String deleteMessage = messageService.getLocalizedMessage("appointment.deleted", languageCode);
         messageService.sendMessage(chatId, deleteMessage);
 
         clearSessionAndShowMenu(chatId);
@@ -845,29 +627,21 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.notFound", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы уверены, что хотите перенести запись на " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "uk".equals(languageCode)
-                ? "Ви впевнені, що хочете перенести запис на " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "Are you sure you want to transfer the appointment on " + appointment.getAppointmentDate().toLocalDate() + " at " + appointment.getAppointmentDate().toLocalTime() + "?";
+        String confirmationMessage = messageService.getLocalizedMessage("appointment.transferConfirmation", languageCode, appointment.getAppointmentDate().toLocalDate(), appointment.getAppointmentDate().toLocalTime());
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton yesButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Да, перенести запись" : "uk".equals(languageCode) ? "Так, перенести запис" : "Yes, Transfer Appointment"
+                messageService.getLocalizedMessage("appointment.transferYes", languageCode)
         );
         yesButton.setCallbackData("/transfer_appointment_" + appointmentId);
 
         InlineKeyboardButton noButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Нет, оставить" : "uk".equals(languageCode) ? "Ні, залишити" : "No, keep"
+                messageService.getLocalizedMessage("appointment.transferNo", languageCode)
         );
         noButton.setCallbackData("/keep_appointment");
 
@@ -883,27 +657,19 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.notFound", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-// Сохраняем идентификатор записи в сессии пользователя, чтобы использовать его на следующих шагах
+        // Сохраняем идентификатор записи в сессии пользователя, чтобы использовать его на следующих шагах
         userSession.setAppointmentToTransfer(chatId, appointmentId);
 
-// Запрашиваем выбор новой даты
-        String selectDateMessage = "ru".equals(languageCode)
-                ? "Пожалуйста, выберите новую дату для записи:"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, оберіть нову дату для запису:"
-                : "Please select a new date for the appointment:";
+        // Запрашиваем выбор новой даты
+        String selectDateMessage = messageService.getLocalizedMessage("appointment.selectNewDate", languageCode);
         messageService.sendMessage(chatId, selectDateMessage);
 
-// Показать доступные даты для этого мастера
+        // Показать доступные даты для этого мастера
         showAvailableDates(chatId, appointment.getMaster().getId());
     }
 
@@ -924,11 +690,7 @@ public class AppointmentService {
                 .collect(Collectors.toList());
 
         if (availableDates.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Нет доступных дат для выбранного мастера."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних дат для обраного майстра."
-                    : "No available dates for the selected master.";
+            String message = messageService.getLocalizedMessage("appointment.noAvailableDates", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -941,11 +703,7 @@ public class AppointmentService {
 
         keyboard.setKeyboard(rows);
 
-        String selectDateMessage = "ru".equals(languageCode)
-                ? "Выберите дату:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату:"
-                : "Select a date:";
+        String selectDateMessage = messageService.getLocalizedMessage("appointment.selectDate", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, selectDateMessage, keyboard);
     }
 
@@ -969,11 +727,9 @@ public class AppointmentService {
         }
 
         keyboard.setKeyboard(rows);
-        String selectTimeMessage = "ru".equals(languageCode)
-                ? "Выберите время:"
-                : "uk".equals(languageCode)
-                ? "Оберіть час:"
-                : "Select a time:";
+
+        // Получение локализованного сообщения
+        String selectTimeMessage = messageService.getLocalizedMessage("appointment.selectTime", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, selectTimeMessage, keyboard);
     }
 
@@ -983,11 +739,7 @@ public class AppointmentService {
 
         Long appointmentId = userSession.getAppointmentToTransfer(chatId);
         if (appointmentId == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись для переноса не выбрана."
-                    : "uk".equals(languageCode)
-                    ? "Запис для перенесення не обрано."
-                    : "No appointment selected for transfer.";
+            String message = messageService.getLocalizedMessage("appointment.transfer.notSelected", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -996,33 +748,30 @@ public class AppointmentService {
         TimeSlot newTimeSlot = timeSlotRepository.findById(timeSlotId).orElse(null);
 
         if (appointment == null || newTimeSlot == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Произошла ошибка при переносе. Пожалуйста, попробуйте снова."
-                    : "uk".equals(languageCode)
-                    ? "Сталася помилка під час перенесення. Будь ласка, спробуйте ще раз."
-                    : "An error occurred during transfer. Please try again.";
+            String message = messageService.getLocalizedMessage("appointment.transfer.error", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-// Сохраняем выбранный timeSlotId в сессии пользователя
+        // Сохраняем выбранный timeSlotId в сессии пользователя
         userSession.setSelectedTimeSlot(chatId, String.valueOf(timeSlotId));
 
-// Подтверждение переноса
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы переносите запись на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nВремя: " + newTimeSlot.getTime() + "\n\nПодтвердить перенос?"
-                : "uk".equals(languageCode)
-                ? "Ви переносите запис на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nЧас: " + newTimeSlot.getTime() + "\n\nПідтвердити перенесення?"
-                : "You are transferring the appointment to:\nDate: " + newTimeSlot.getAvailableDate().getDate() + "\nTime: " + newTimeSlot.getTime() + "\n\nConfirm transfer?";
+        // Подтверждение переноса
+        String confirmationMessage = messageService.getLocalizedMessage(
+                "appointment.transfer.confirmation",
+                languageCode,
+                newTimeSlot.getAvailableDate().getDate(),
+                newTimeSlot.getTime()
+        );
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton confirmButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Подтвердить перенос" : "uk".equals(languageCode) ? "Підтвердити перенесення" : "Confirm Transfer"
+                messageService.getLocalizedMessage("appointment.transfer.confirm", languageCode)
         );
         confirmButton.setCallbackData("/transfer_final_" + appointmentId);
 
         InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Отменить перенос" : "uk".equals(languageCode) ? "Скасувати перенесення" : "Cancel Transfer"
+                messageService.getLocalizedMessage("appointment.transfer.cancel", languageCode)
         );
         cancelButton.setCallbackData("/keep_appointment");
 
@@ -1040,11 +789,7 @@ public class AppointmentService {
         TimeSlot newTimeSlot = timeSlotRepository.findById(timeSlotId).orElse(null);
 
         if (appointment == null || newTimeSlot == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Перенос не удался. Пожалуйста, попробуйте снова."
-                    : "uk".equals(languageCode)
-                    ? "Перенесення не вдалося. Будь ласка, спробуйте ще раз."
-                    : "Transfer failed. Please try again.";
+            String message = messageService.getLocalizedMessage("appointment.transfer.failed", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -1074,11 +819,7 @@ public class AppointmentService {
         timeSlotRepository.save(newTimeSlot);
 
         // Уведомляем пользователя о переносе
-        String message = "ru".equals(languageCode)
-                ? "Запись успешно перенесена на новую дату и время."
-                : "uk".equals(languageCode)
-                ? "Запис успішно перенесено на нову дату і час."
-                : "Appointment successfully transferred to the new date and time.";
+        String message = messageService.getLocalizedMessage("appointment.transfer.success", languageCode);
         messageService.sendMessage(chatId, message);
         autUserButtons.showBookingInfoMenu(chatId);
 
@@ -1090,17 +831,14 @@ public class AppointmentService {
             String clientName = (users != null) ? users.getFirstName() + " " + users.getLastName() : "Unknown";
 
             String languageCodeMaster = userRepository.findLanguageCodeByChatId(masterChatId);
-            String masterNotification = "ru".equals(languageCodeMaster)
-                    ? "Запись для клиента " + clientName +
-                    " на услугу " + appointment.getServices().getNameRu() +
-                    " перенесена на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nВремя: " + newTimeSlot.getTime()
-                    : "uk".equals(languageCodeMaster)
-                    ? "Запис для клієнта " + clientName +
-                    " на послугу " + appointment.getServices().getNameUk() +
-                    " перенесено на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nЧас: " + newTimeSlot.getTime()
-                    : "The appointment for " + appointment.getServices().getNameEn() +
-                    " with client " + clientName +
-                    " has been rescheduled to:\nDate: " + newTimeSlot.getAvailableDate().getDate() + "\nTime: " + newTimeSlot.getTime();
+            String masterNotification = messageService.getLocalizedMessage(
+                    "appointment.transfer.masterNotification",
+                    languageCodeMaster,
+                    clientName,
+                    appointment.getServices(),
+                    newTimeSlot.getAvailableDate().getDate(),
+                    newTimeSlot.getTime()
+            );
 
             messageService.sendMessage(masterChatId, masterNotification);
         }
@@ -1112,31 +850,28 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null || !appointment.getStatus().equals(Appointment.Status.CONFIRMED)) {
-            String message = "ru".equals(languageCode)
-                    ? "Выбранная запись недоступна для отмены."
-                    : "uk".equals(languageCode)
-                    ? "Обраний запис недоступний для скасування."
-                    : "The selected appointment is not available for cancellation.";
+            String message = messageService.getLocalizedMessage("appointment.cancel.notAvailable", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-// Сообщение с подтверждением отмены
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы уверены, что хотите отменить запись на " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "uk".equals(languageCode)
-                ? "Ви впевнені, що хочете скасувати запис на " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "Are you sure you want to cancel the appointment on " + appointment.getAppointmentDate().toLocalDate() + " at " + appointment.getAppointmentDate().toLocalTime() + "?";
+        // Сообщение с подтверждением отмены
+        String confirmationMessage = messageService.getLocalizedMessage(
+                "appointment.cancel.confirmation",
+                languageCode,
+                appointment.getAppointmentDate().toLocalDate(),
+                appointment.getAppointmentDate().toLocalTime()
+        );
 
-// Создание inline-кнопок для подтверждения или отмены
+        // Создание inline-кнопок для подтверждения или отмены
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton yesButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Да, отменить" : "uk".equals(languageCode) ? "Так, скасувати" : "Yes, cancel"
+                messageService.getLocalizedMessage("appointment.cancel.yes", languageCode)
         );
         yesButton.setCallbackData("/cancel_appointment_" + appointmentId);
 
         InlineKeyboardButton noButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Нет, оставить" : "uk".equals(languageCode) ? "Ні, залишити" : "No, keep"
+                messageService.getLocalizedMessage("appointment.cancel.no", languageCode)
         );
         noButton.setCallbackData("/keep_appointment");
 
@@ -1152,20 +887,16 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null || !appointment.getStatus().equals(Appointment.Status.CONFIRMED)) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись недоступна для отмены."
-                    : "uk".equals(languageCode)
-                    ? "Запис недоступний для скасування."
-                    : "The appointment is not available for cancellation.";
+            String message = messageService.getLocalizedMessage("appointment.cancel.notAvailable", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-// Обновляем статус записи на "CANCELLED"
+        // Обновляем статус записи на "CANCELLED"
         appointment.setStatus(Appointment.Status.CANCELLED);
         appointmentRepository.save(appointment);
 
-// Обновляем статус слота времени
+        // Обновляем статус слота времени
         TimeSlot timeSlot = timeSlotRepository.findByTimeAndMasterId(
                 appointment.getAppointmentDate().toLocalTime(),
                 appointment.getMaster().getId()
@@ -1179,11 +910,7 @@ public class AppointmentService {
         userSession.setCurrentState(chatId, "/book_info");
         userSession.setPreviousState(chatId, "/book_service");
 
-        String successMessage = "ru".equals(languageCode)
-                ? "Ваша запись успешно отменена."
-                : "uk".equals(languageCode)
-                ? "Ваш запис успішно скасовано."
-                : "Your appointment has been successfully canceled.";
+        String successMessage = messageService.getLocalizedMessage("appointment.cancel.success", languageCode);
         messageService.sendMessage(chatId, successMessage);
 
         autUserButtons.showBookingInfoMenu(chatId);
@@ -1196,14 +923,9 @@ public class AppointmentService {
             String appointmentTime = appointment.getAppointmentDate().toLocalTime().toString();
 
             String languageCodeMaster = userRepository.findLanguageCodeByChatId(masterChatId);
-            String masterNotification = "ru".equals(languageCodeMaster)
-                    ? "Клиент " + clientName + " отменил запись на " + appointmentDate + " в " + appointmentTime + "."
-                    : "uk".equals(languageCodeMaster)
-                    ? "Клієнт " + clientName + " скасував запис на " + appointmentDate + " о " + appointmentTime + "."
-                    : "Client " + clientName + " has canceled the appointment on " + appointmentDate + " at " + appointmentTime + ".";
+            String masterNotification = messageService.getLocalizedMessage("appointment.cancel.masterNotification", languageCodeMaster, clientName, appointmentDate, appointmentTime);
 
             messageService.sendMessage(masterChatId, masterNotification);
         }
     }
-
 }

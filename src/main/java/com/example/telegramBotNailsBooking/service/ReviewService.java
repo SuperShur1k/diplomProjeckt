@@ -61,31 +61,26 @@ public class ReviewService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.not_found", languageCode);
             messageService.sendMessage(chatID, message);
             return;
         }
 
         // Подтверждение отправки отзыва
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы уверены, что хотите отправить отзыв для этой записи: " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "uk".equals(languageCode)
-                ? "Ви впевнені, що хочете надіслати відгук для цього запису: " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + "?"
-                : "Are you sure you want to send review for this appointment: " + appointment.getAppointmentDate().toLocalDate() + " " + appointment.getAppointmentDate().toLocalTime() + "?";
+        String confirmationMessage = messageService.getLocalizedMessage(
+                "appointment.feedback_confirmation", languageCode,
+                appointment.getAppointmentDate().toLocalDate(), appointment.getAppointmentDate().toLocalTime()
+        );
 
         // Кнопки для подтверждения и отмены
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton yesButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Да, отправить отзыв" : "uk".equals(languageCode) ? "Так, надіслати відгук" : "Yes, Send Review"
+                messageService.getLocalizedMessage("appointment.send_review", languageCode)
         );
         yesButton.setCallbackData("/review_appointment_" + appointmentId);
 
         InlineKeyboardButton noButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Нет, не сегодня" : "uk".equals(languageCode) ? "Ні, не сьогодні" : "No, not today"
+                messageService.getLocalizedMessage("appointment.cancel_review", languageCode)
         );
         noButton.setCallbackData("/keep_appointment");
 
@@ -105,12 +100,8 @@ public class ReviewService {
     private void requestRating(Long chatID) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatID);  // Получаем язык пользователя
 
-        // Сообщение для запроса оценки
-        String message = "ru".equals(languageCode)
-                ? "Пожалуйста, поставьте оценку за вашу запись (1-5):"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, поставте оцінку за вашу запис (1-5):"
-                : "Please provide a rating for your appointment (1-5):";
+        // Запрос на оценку с использованием локализованных сообщений
+        String message = messageService.getLocalizedMessage("appointment.request_rating", languageCode);
 
         messageService.sendMessage(chatID, message);
         userSession.setCurrentState(chatID, "/waiting_for_rating_");
@@ -122,28 +113,19 @@ public class ReviewService {
 
         try {
             if (rating < 1 || rating > 5) {
-                String message = "ru".equals(languageCode)
-                        ? "Неверная оценка. Пожалуйста, поставьте оценку от 1 до 5."
-                        : "uk".equals(languageCode)
-                        ? "Невірна оцінка. Будь ласка, поставте оцінку від 1 до 5."
-                        : "Invalid rating. Please provide a rating between 1 and 5.";
+                // Получаем локализованное сообщение для некорректной оценки
+                String message = messageService.getLocalizedMessage("appointment.invalid_rating", languageCode);
                 messageService.sendMessage(chatID, message);
                 requestRating(chatID);  // Запрос повторно, если оценка некорректна
             } else {
-                String message = "ru".equals(languageCode)
-                        ? "Спасибо! Теперь, пожалуйста, оставьте комментарий о вашем опыте:"
-                        : "uk".equals(languageCode)
-                        ? "Дякуємо! Тепер, будь ласка, залиште коментар про ваш досвід:"
-                        : "Thank you! Now, please leave a comment about your experience:";
+                // Получаем локализованное сообщение для запроса комментария
+                String message = messageService.getLocalizedMessage("appointment.thank_you_comment", languageCode);
                 messageService.sendMessage(chatID, message);
                 userSession.setCurrentState(chatID, "/waiting_for_comment_" + rating);
             }
         } catch (NumberFormatException e) {
-            String message = "ru".equals(languageCode)
-                    ? "Неверный ввод. Пожалуйста, введите число от 1 до 5."
-                    : "uk".equals(languageCode)
-                    ? "Невірний ввід. Будь ласка, введіть число від 1 до 5."
-                    : "Invalid input. Please enter a number between 1 and 5.";
+            // Получаем локализованное сообщение для неверного ввода
+            String message = messageService.getLocalizedMessage("appointment.invalid_input", languageCode);
             messageService.sendMessage(chatID, message);
             requestRating(chatID);
         }
@@ -155,19 +137,13 @@ public class ReviewService {
         if (rating != null && appointmentId != null && comment != null) {
             handleClientFeedback(chatID, rating, comment, appointmentId);
         } else if (comment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Пожалуйста, оставьте не пустой комментарий о вашем опыте:"
-                    : "uk".equals(languageCode)
-                    ? "Будь ласка, залиште непорожній коментар про ваш досвід:"
-                    : "Please leave a not empty comment about your experience:";
+            // Получаем локализованное сообщение для запроса комментария
+            String message = messageService.getLocalizedMessage("feedback.leave_comment", languageCode);
             messageService.sendMessage(chatID, message);
             userSession.setCurrentState(chatID, "/waiting_for_comment_" + rating);
         } else {
-            String message = "ru".equals(languageCode)
-                    ? "Сессия отзыва была прервана. Пожалуйста, попробуйте снова."
-                    : "uk".equals(languageCode)
-                    ? "Сесію відгуку було перервано. Будь ласка, спробуйте ще раз."
-                    : "Feedback session was interrupted. Please try again.";
+            // Получаем локализованное сообщение для ошибки
+            String message = messageService.getLocalizedMessage("feedback.session_interrupted", languageCode);
             messageService.sendMessage(chatID, message);
             autUserButtons.showBookingInfoMenu(chatID);
         }
@@ -183,44 +159,21 @@ public class ReviewService {
                 // Добавляем отзыв
                 addReview(appointment.getUsers().getId(), appointment.getMaster().getId(), rating, comment);
 
-                // Сообщение для мастера
-                String masterNotification = "ru".equals(languageCode)
-                        ? "Клиент " + appointment.getUsers().getFirstName() + " " + appointment.getUsers().getLastName() +
-                        " оставил отзыв о процедуре: " + appointment.getServices().getNameRu() + "\n" +
-                        "Дата: " + appointment.getAppointmentDate().toLocalDate() + "\n" +
-                        "Время: " + appointment.getAppointmentDate().toLocalTime() + "\n" +
-                        "Оценка: " + rating + "\n" +
-                        "Комментарий: " + comment
-                        : "uk".equals(languageCode)
-                        ? "Клієнт " + appointment.getUsers().getFirstName() + " " + appointment.getUsers().getLastName() +
-                        " залишив відгук про процедуру: " + appointment.getServices().getNameUk() + "\n" +
-                        "Дата: " + appointment.getAppointmentDate().toLocalDate() + "\n" +
-                        "Час: " + appointment.getAppointmentDate().toLocalTime() + "\n" +
-                        "Оцінка: " + rating + "\n" +
-                        "Коментар: " + comment
-                        : "Client " + appointment.getUsers().getFirstName() + " " + appointment.getUsers().getLastName() +
-                        " wrote a review of the procedure: " + appointment.getServices().getNameEn() + "\n" +
-                        "Date: " + appointment.getAppointmentDate().toLocalDate() + "\n" +
-                        "Time: " + appointment.getAppointmentDate().toLocalTime() + "\n" +
-                        "Rating: " + rating + "\n" +
-                        "Comment: " + comment;
+                // Локализованное сообщение для мастера
+                String masterNotification = messageService.getLocalizedMessage("feedback.master_notification", languageCode,
+                        appointment.getUsers().getFirstName(), appointment.getUsers().getLastName(),
+                        appointment.getServices().getNameRu(), appointment.getAppointmentDate().toLocalDate(),
+                        appointment.getAppointmentDate().toLocalTime(), rating, comment);
 
                 messageService.sendMessage(appointment.getMaster().getChatId(), masterNotification);
 
-                // Сообщение клиенту
-                String feedbackMessage = "ru".equals(languageCode)
-                        ? "Спасибо за ваш отзыв!"
-                        : "uk".equals(languageCode)
-                        ? "Дякуємо за ваш відгук!"
-                        : "Thank you for your feedback!";
+                // Локализованное сообщение для клиента
+                String feedbackMessage = messageService.getLocalizedMessage("feedback.thank_you", languageCode);
                 messageService.sendMessage(chatId, feedbackMessage);
                 autUserButtons.showBookingInfoMenu(chatId);
             } else {
-                String errorMessage = "ru".equals(languageCode)
-                        ? "Не удалось найти запись для оставления отзыва."
-                        : "uk".equals(languageCode)
-                        ? "Не вдалося знайти запис для залишення відгуку."
-                        : "Could not find the appointment to leave feedback.";
+                // Локализованное сообщение об ошибке
+                String errorMessage = messageService.getLocalizedMessage("feedback.error_no_appointment", languageCode);
                 messageService.sendMessage(chatId, errorMessage);
                 autUserButtons.showBookingInfoMenu(chatId);
             }
@@ -232,11 +185,8 @@ public class ReviewService {
             userSession.setCurrentState(chatId, "/book_info");
             userSession.setPreviousState(chatId, "/book_service");
         } else {
-            String noFeedbackMessage = "ru".equals(languageCode)
-                    ? "Нет ожидающих отзывов."
-                    : "uk".equals(languageCode)
-                    ? "Немає очікуючих відгуків."
-                    : "No pending feedback request.";
+            // Локализованное сообщение о том, что нет ожидающих отзывов
+            String noFeedbackMessage = messageService.getLocalizedMessage("feedback.no_pending_feedback", languageCode);
             messageService.sendMessage(chatId, noFeedbackMessage);
             userSession.clearRequestingFeedback(chatId);
             userSession.clearStates(chatId);
@@ -254,26 +204,23 @@ public class ReviewService {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Для каждого мастера создаем кнопку
         for (Master master : masters) {
             InlineKeyboardButton button = new InlineKeyboardButton(master.getName());
             button.setCallbackData("/show_reviews_" + master.getId());
             rows.add(List.of(button));
         }
 
+        // Кнопка для возврата в меню
         InlineKeyboardButton menuButton = new InlineKeyboardButton();
-        menuButton.setText(
-                "ru".equals(languageCode) ? "Назад в меню" : "uk".equals(languageCode) ? "Назад до меню" : "Back to Menu"
-        );
-        menuButton.setCallbackData("/start");
+        menuButton.setText(messageService.getLocalizedMessage("menu.back_to_menu", languageCode));
+        menuButton.setCallbackData("/main_menu");
         rows.add(List.of(menuButton));
 
         keyboard.setKeyboard(rows);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите мастера, чтобы увидеть отзывы:"
-                : "uk".equals(languageCode)
-                ? "Оберіть майстра, щоб побачити відгуки:"
-                : "Select a master to see reviews:";
+        // Сообщение для пользователя
+        String message = messageService.getLocalizedMessage("reviews.select_master_for_reviews", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -282,35 +229,26 @@ public class ReviewService {
         List<Review> reviews = reviewRepository.findTop5ByMasterIdOrderByCreatedAtDesc(masterId);
 
         if (reviews.isEmpty()) {
-            String noReviewsMessage = "ru".equals(languageCode)
-                    ? "Не найдено отзывов для этого мастера."
-                    : "uk".equals(languageCode)
-                    ? "Не знайдено відгуків для цього майстра."
-                    : "No reviews found for this master.";
-
+            // Получаем сообщение, если отзывов нет
+            String noReviewsMessage = messageService.getLocalizedMessage("reviews.no_reviews_for_master", languageCode);
             messageService.sendMessageWithInlineKeyboard(chatId, noReviewsMessage,
                     autUserButtons.getAuthenticatedInlineKeyboard(chatId));
             return;
         }
 
-        String reviewText = "ru".equals(languageCode)
-                ? "Последние отзывы:\n\n"
-                : "uk".equals(languageCode)
-                ? "Останні відгуки:\n\n"
-                : "Latest reviews:\n\n";
+        // Получаем заголовок для списка отзывов
+        String reviewText = messageService.getLocalizedMessage("reviews.latest_reviews", languageCode);
 
+        // Добавляем отзывы
         for (Review review : reviews) {
-            reviewText += "ru".equals(languageCode)
-                    ? "Оценка: " + review.getRating() + "\nКомментарий: " + review.getComment() + "\n---\n"
-                    : "uk".equals(languageCode)
-                    ? "Оцінка: " + review.getRating() + "\nКоментар: " + review.getComment() + "\n---\n"
-                    : "Rating: " + review.getRating() + "\nComment: " + review.getComment() + "\n---\n";
+            reviewText += messageService.getLocalizedMessage("reviews.review_details", languageCode, review.getRating(), review.getComment());
         }
 
+        // Создаем кнопку "Назад"
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         InlineKeyboardButton backButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Назад к мастерам" : "uk".equals(languageCode) ? "Назад до майстрів" : "Back to Masters"
+                messageService.getLocalizedMessage("menu.back_to_masters", languageCode)
         );
         backButton.setCallbackData("/review");
         rows.add(List.of(backButton));

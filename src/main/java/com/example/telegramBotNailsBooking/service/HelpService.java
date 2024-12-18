@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class HelpService {
@@ -34,15 +33,4 @@ public class HelpService {
         // Сохраняем запрос в базе данных
         return helpRepository.save(helpRequest);
     }
-
-    public void addAdminResponse(Long helpId, String response) {
-        Help help = helpRepository.findById(helpId)
-                .orElseThrow(() -> new IllegalArgumentException("Help request not found with id: " + helpId));
-
-        help.setAdminResponse(response);
-        help.setStatus(Help.HelpStatus.CLOSED); // Например, закрываем запрос после ответа
-        help.setClosedAt(LocalDateTime.now()); // Устанавливаем время закрытия
-        helpRepository.save(help);
-    }
-
 }

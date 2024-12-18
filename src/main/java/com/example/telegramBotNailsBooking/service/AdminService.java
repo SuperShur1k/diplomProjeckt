@@ -55,8 +55,7 @@ public class AdminService {
 
     @Autowired
     private AvailableDateRepository availableDateRepository;
-    @Autowired
-    private ServiceManagementService serviceManagementService;
+
     @Autowired
     private ServiceRepository serviceRepository;
 
@@ -64,46 +63,30 @@ public class AdminService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);  // Получаем язык пользователя
 
         // Локализуем сообщение
-        String message;
-        if ("ru".equals(languageCode)) {
-            message = "Добро пожаловать в панель администратора. Вы можете управлять пользователями и назначать новых администраторов.";
-        } else if ("uk".equals(languageCode)) {
-            message = "Ласкаво просимо в панель адміністратора. Ви можете керувати користувачами та призначати нових адміністраторів.";
-        } else {
-            message = "Welcome to the Admin Panel. You can manage users and set new admins.";
-        }
+        messageService.sendLocalizedMessageWithInlineKeyboard(
+                chatId,
+                "admin.panel.welcome", // Ключ локализации
+                languageCode,
+                adminButtons.getAdminInlineKeyboard(chatId)
+        );
 
-        messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getAdminInlineKeyboard(chatId));
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/admin");
         userSession.setPreviousState(chatId, "/main_menu");
     }
 
-    protected void initiateSetAdmin(Long chatId) {
-        String languageCode = userRepository.findLanguageCodeByChatId(chatId);  // Получаем язык пользователя
+    public void initiateSetAdmin(Long chatId) {
+        String languageCode = userRepository.findLanguageCodeByChatId(chatId); // Получаем язык пользователя
 
-        // Локализуем сообщение
-        String message;
-        if ("ru".equals(languageCode)) {
-            message = "Пожалуйста, введите номер телефона пользователя, которого вы хотите назначить администратором.";
-        } else if ("uk".equals(languageCode)) {
-            message = "Будь ласка, введіть номер телефону користувача, якого ви хочете призначити адміністратором.";
-        } else {
-            message = "Please enter the phone number of the user you want to make an admin.";
-        }
-
-        messageService.sendMessage(chatId, message);
+        // Локализуем сообщение с ключами из файла messages.properties
+        messageService.sendLocalizedMessage(chatId, "set.admin.enter.phone", languageCode);
         userSession.setSettingAdmin(chatId, true);
 
-        if ("ru".equals(languageCode)) {
-            message = "Вы можете отменить эту операцию, используя кнопку ниже.";
-        } else if ("uk".equals(languageCode)) {
-            message = "Ви можете скасувати цю операцію, використовуючи кнопку нижче.";
-        } else {
-            message = "You can cancel this operation using the button below.";
-        }
-        messageService.sendMessageWithInlineKeyboard(chatId, message, autUserButtons.getCancelInlineKeyboard(chatId));
-
+        // Второе сообщение с кнопкой отмены
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                "set.admin.cancel.operation",
+                languageCode,
+                autUserButtons.getCancelInlineKeyboard(chatId));
     }
 
     public void setAdmin(Long chatId, String phone) {
@@ -112,35 +95,26 @@ public class AdminService {
         // Находим пользователя по номеру телефона
         Users users = userRepository.findByPhoneNumber(phone);
         if (users == null) {
-            String message;
-            if ("ru".equals(languageCode)) {
-                message = "Пользователь не найден. Пожалуйста, попробуйте снова.";
-            } else if ("uk".equals(languageCode)) {
-                message = "Користувача не знайдено. Будь ласка, спробуйте ще раз.";
-            } else {
-                message = "User not found. Please try again.";
-            }
-
-            messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getAdminInlineKeyboard(chatId));
+            // Локализованное сообщение "Пользователь не найден"
+            messageService.sendLocalizedMessageWithInlineKeyboard(
+                    chatId,
+                    "admin.user.not.found",
+                    languageCode,
+                    adminButtons.getAdminInlineKeyboard(chatId));
             userSession.setSettingAdmin(chatId, false); // Сбрасываем состояние назначения администратора
         } else {
             // Назначаем роль администратора
             users.setRole(Users.Role.ADMIN);
-
             log.info("Saving user with role: {}", users.getRole());
-
             userRepository.save(users);
 
-            String message;
-            if ("ru".equals(languageCode)) {
-                message = "Пользователь " + users.getFirstName() + " " + users.getLastName() + " успешно получил права администратора.";
-            } else if ("uk".equals(languageCode)) {
-                message = "Користувач " + users.getFirstName() + " " + users.getLastName() + " успішно отримав права адміністратора.";
-            } else {
-                message = "User " + users.getFirstName() + " " + users.getLastName() + " has been successfully granted admin rights.";
-            }
-
-            messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getAdminInlineKeyboard(chatId));
+            // Локализованное сообщение "Пользователь успешно получил права администратора"
+            messageService.sendLocalizedMessageWithInlineKeyboard(
+                    chatId,
+                    "admin.user.successfully.granted",
+                    languageCode,
+                    adminButtons.getAdminInlineKeyboard(chatId),
+                    users.getFirstName(), users.getLastName());
             userSession.setSettingAdmin(chatId, false); // Сбрасываем состояние назначения администратора
         }
     }
@@ -150,16 +124,13 @@ public class AdminService {
 
         // Получаем список всех администраторов
         List<Users> admins = userRepository.findAll().stream()
-                .filter(user -> user.getRole() == Users.Role.ADMIN)
+                .filter(user -> user.getRole().equals(Users.Role.ADMIN))
                 .collect(Collectors.toList());
 
         if (admins.isEmpty()) {
-            String noAdminsMessage = "ru".equals(languageCode)
-                    ? "В системе нет администраторов, которых можно снять с роли."
-                    : "uk".equals(languageCode)
-                    ? "У системі немає адміністраторів, яких можна позбавити ролі."
-                    : "There are no administrators in the system to remove the role.";
-            messageService.sendMessageWithInlineKeyboard(chatId, noAdminsMessage, adminButtons.getAdminInlineKeyboard(chatId));
+            messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                    "admin.remove.no.admins", languageCode,
+                    adminButtons.getAdminInlineKeyboard(chatId));
             return;
         }
 
@@ -176,98 +147,66 @@ public class AdminService {
 
         // Добавляем кнопку "Отмена"
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText(
-                "ru".equals(languageCode) ? "Отмена" :
-                        "uk".equals(languageCode) ? "Скасувати" :
-                                "Cancel"
-        );
+        cancelButton.setText(messageService.getLocalizedMessage("button.cancel", languageCode));
         cancelButton.setCallbackData("/cancel");
         rows.add(List.of(cancelButton));
 
         keyboard.setKeyboard(rows);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите администратора, чтобы снять его роль."
-                : "uk".equals(languageCode)
-                ? "Виберіть адміністратора, щоб зняти його роль."
-                : "Select an admin to remove their role.";
-
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                "admin.remove.choose", languageCode, keyboard);
     }
 
     public void removeAdminById(Long chatId, Long adminId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
         Users admin = userRepository.findById(adminId).orElse(null);
-        if (admin == null || admin.getRole() != Users.Role.ADMIN) {
-            String message = "ru".equals(languageCode)
-                    ? "Администратор не найден или он уже не является администратором."
-                    : "uk".equals(languageCode)
-                    ? "Адміністратора не знайдено або він вже не є адміністратором."
-                    : "Admin not found or they are no longer an administrator.";
-
-            messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getAdminInlineKeyboard(chatId));
+        if (admin == null || !admin.getRole().equals(Users.Role.ADMIN)) {
+            messageService.sendLocalizedMessageWithInlineKeyboard(
+                    chatId,
+                    "admin.not.found.or.removed",
+                    languageCode,
+                    adminButtons.getAdminInlineKeyboard(chatId)
+            );
             return;
         }
 
         admin.setRole(Users.Role.CLIENT);
         userRepository.save(admin);
 
-        String successMessage = "ru".equals(languageCode)
-                ? "Роль администратора успешно снята с пользователя " + admin.getFirstName() + " " + admin.getLastName() + "."
-                : "uk".equals(languageCode)
-                ? "Роль адміністратора успішно знято з користувача " + admin.getFirstName() + " " + admin.getLastName() + "."
-                : "Admin role has been successfully removed from user " + admin.getFirstName() + " " + admin.getLastName() + ".";
-
-        messageService.sendMessageWithInlineKeyboard(chatId, successMessage, adminButtons.getAdminInlineKeyboard(chatId));
-    }
-
-    public void cancelAdminAction(Long chatId) {
-        String languageCode = userRepository.findLanguageCodeByChatId(chatId);  // Получаем язык пользователя
-
-        userSession.clearSession(chatId);
-
-        String message;
-        if ("ru".equals(languageCode)) {
-            message = "Текущая операция была отменена.";
-        } else if ("uk".equals(languageCode)) {
-            message = "Поточну операцію було скасовано.";
-        } else {
-            message = "Current operation has been cancelled.";
-        }
-
-        messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getAdminInlineKeyboard(chatId));
+        messageService.sendLocalizedMessageWithInlineKeyboard(
+                chatId,
+                "admin.role.removed.success",
+                languageCode,
+                adminButtons.getAdminInlineKeyboard(chatId),
+                admin.getFirstName(), admin.getLastName()
+        );
     }
 
     public void takeAnswerToHelp(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-
-        String message = "ru".equals(languageCode)
-                ? "Выберите категорию запросов:"
-                : "uk".equals(languageCode)
-                ? "Оберіть категорію запитів:"
-                : "Choose a request category:";
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // Кнопка "Открытые"
         InlineKeyboardButton openRequestsButton = new InlineKeyboardButton();
-        openRequestsButton.setText("ru".equals(languageCode) ? "Открытые" : "uk".equals(languageCode) ? "Відкриті" : "Open");
+        openRequestsButton.setText(messageService.getLocalizedMessage("requests.open", languageCode));
         openRequestsButton.setCallbackData("/open_requests");
 
         // Кнопка "В процессе"
         InlineKeyboardButton inProgressRequestsButton = new InlineKeyboardButton();
-        inProgressRequestsButton.setText("ru".equals(languageCode) ? "В процессе" : "uk".equals(languageCode) ? "У процесі" : "In Progress");
+        inProgressRequestsButton.setText(messageService.getLocalizedMessage("requests.in.progress", languageCode));
         inProgressRequestsButton.setCallbackData("/progress_requests");
 
         // Кнопка "Завершенные"
         InlineKeyboardButton closedRequestsButton = new InlineKeyboardButton();
-        closedRequestsButton.setText("ru".equals(languageCode) ? "Завершенные" : "uk".equals(languageCode) ? "Завершені" : "Closed");
+        closedRequestsButton.setText(messageService.getLocalizedMessage("requests.closed", languageCode));
         closedRequestsButton.setCallbackData("/closed_requests");
 
+        // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
 
         rows.add(List.of(openRequestsButton));
@@ -277,7 +216,7 @@ public class AdminService {
 
         keyboard.setKeyboard(rows);
 
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "requests.choose.category", languageCode, keyboard);
     }
 
     public void openRequest(Long chatId) {
@@ -286,25 +225,16 @@ public class AdminService {
         List<Help> openRequests = helpRepository.findByStatus(Help.HelpStatus.WAIT);
 
         if (openRequests.isEmpty()) {
-            String noRequestsMessage = "ru".equals(languageCode)
-                    ? "У вас нет открытых запросов."
-                    : "uk".equals(languageCode)
-                    ? "У вас немає відкритих запитів."
-                    : "You have no open requests.";
-            messageService.sendMessage(chatId, noRequestsMessage);
+            messageService.sendLocalizedMessage(chatId,
+                    "open.requests.none",
+                    languageCode);
             return;
         }
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату открытого запроса:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату відкритого запиту:"
-                : "Select the date of the open request:";
-
+        // Сообщение с выбором даты запроса
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        // Создаем кнопки для каждого запроса
         for (Help help : openRequests) {
             InlineKeyboardButton button = new InlineKeyboardButton();
             button.setText(help.getCreatedAt().toLocalDate().toString()); // Только дата
@@ -312,14 +242,19 @@ public class AdminService {
             rows.add(List.of(button));
         }
 
-        // Добавляем кнопки назад
+        // Добавляем кнопку "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("button.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+
+        // Отправляем локализованное сообщение
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId,
+                "open.requests.select.date",
+                languageCode,
+                keyboard);
     }
 
     public void viewOpenRequest(Long chatId, Long requestId) {
@@ -328,34 +263,33 @@ public class AdminService {
         Help help = helpRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
 
-        String message = "ru".equals(languageCode)
-                ? "Запрос на помощь:\n" + help.getHelpQuestion()
-                : "uk".equals(languageCode)
-                ? "Запит на допомогу:\n" + help.getHelpQuestion()
-                : "Help request:\n" + help.getHelpQuestion();
+        // Локализованное сообщение
+        String message = messageService.getLocalizedMessage(
+                "help.request",
+                languageCode,
+                help.getHelpQuestion()
+        );
 
+        // Создаем inline-клавиатуру
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // Кнопка "Дать ответ"
         InlineKeyboardButton answerButton = new InlineKeyboardButton();
-        answerButton.setText("ru".equals(languageCode)
-                ? "Дать ответ"
-                : "uk".equals(languageCode)
-                ? "Дати відповідь"
-                : "Answer");
+        answerButton.setText(messageService.getLocalizedMessage("button.answer", languageCode));
         answerButton.setCallbackData("/answer_request_" + requestId);
         rows.add(List.of(answerButton));
 
         // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("button.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
 
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+        // Отправляем сообщение с клавиатурой
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "help.request", languageCode, keyboard, help.getHelpQuestion());
     }
 
     public void initialAnswerRequest(Long chatId, Long requestId) {
@@ -365,14 +299,10 @@ public class AdminService {
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/waiting_answer_" + requestId);
 
-        // Сообщение для администратора с запросом ответа
-        String message = "ru".equals(languageCode)
-                ? "Введите ваш ответ на запрос помощи:"
-                : "uk".equals(languageCode)
-                ? "Введіть вашу відповідь на запит про допомогу:"
-                : "Please enter your response to the help request:";
-
-        messageService.sendMessage(chatId, message);
+        // Локализованное сообщение для администратора
+        messageService.sendLocalizedMessage(chatId,
+                "admin.enter.response",
+                languageCode);
     }
 
     public void answerRequest(Long chatId, Long requestId, String answer) {
@@ -380,7 +310,8 @@ public class AdminService {
 
         // Находим запрос помощи
         Help help = helpRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Help request not found with id: " + requestId));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        messageService.getLocalizedMessage("help.request.not.found", languageCode, requestId)));
 
         // Устанавливаем данные администратора, ответ и статус
         help.setAdmin(userRepository.findByChatId(chatId));
@@ -389,12 +320,7 @@ public class AdminService {
         helpRepository.save(help);
 
         // Отправляем подтверждение админу о том, что ответ сохранен
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Ваш ответ на запрос помощи сохранен."
-                : "uk".equals(languageCode)
-                ? "Ваш відповідь на запит про допомогу збережено."
-                : "Your response to the help request has been saved.";
-
+        String confirmationMessage = messageService.getLocalizedMessage("admin.response.saved", languageCode);
         messageService.sendMessage(chatId, confirmationMessage);
 
         // Очищаем состояние пользователя и возвращаем его к списку открытых запросов
@@ -411,20 +337,10 @@ public class AdminService {
         List<Help> inProgressRequests = helpRepository.findByAdmin_IdAndStatus(userId, Help.HelpStatus.OPEN);
 
         if (inProgressRequests.isEmpty()) {
-            String noRequestsMessage = "ru".equals(languageCode)
-                    ? "У вас нет запросов в процессе."
-                    : "uk".equals(languageCode)
-                    ? "У вас немає запитів у процесі."
-                    : "You have no requests in progress.";
+            String noRequestsMessage = messageService.getLocalizedMessage("requests.in.progress.none", languageCode);
             messageService.sendMessage(chatId, noRequestsMessage);
             return;
         }
-
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату запроса в процессе:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату запиту у процесі:"
-                : "Select the date of the request in progress:";
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -437,36 +353,34 @@ public class AdminService {
         }
 
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "requests.in.progress.select.date", languageCode, keyboard);
     }
 
     public void progressRequest(Long chatId, Long requestId) {
         Help help = helpRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        messageService.getLocalizedMessage("help.request.not.found", userRepository.findLanguageCodeByChatId(chatId), requestId)));
 
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-
-        String message = "ru".equals(languageCode)
-                ? "Запрос пользователя:\n" + help.getHelpQuestion() + "\nВаш ответ:\n" + help.getAdminResponse()
-                : "uk".equals(languageCode)
-                ? "Запит користувача:\n" + help.getHelpQuestion() + "\nВаша відповідь:\n" + help.getAdminResponse()
-                : "User request:\n" + help.getHelpQuestion() + "\nYour response:\n" + help.getAdminResponse();
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
+
         keyboard.setKeyboard(rows);
 
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+        // Используем ваш метод для отправки сообщения с инлайн-клавиатурой
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "user.request", languageCode, keyboard, help.getHelpQuestion(), help.getAdminResponse());
     }
 
     public void initialClosedRequest(Long chatId) {
@@ -476,20 +390,10 @@ public class AdminService {
         List<Help> closedRequests = helpRepository.findByAdmin_IdAndStatus(userId, Help.HelpStatus.CLOSED);
 
         if (closedRequests.isEmpty()) {
-            String noRequestsMessage = "ru".equals(languageCode)
-                    ? "У вас нет завершенных запросов."
-                    : "uk".equals(languageCode)
-                    ? "У вас немає завершених запитів."
-                    : "You have no closed requests.";
+            String noRequestsMessage = messageService.getLocalizedMessage("requests.closed.none", languageCode);
             messageService.sendMessage(chatId, noRequestsMessage);
             return;
         }
-
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату завершенного запроса:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату завершеного запиту:"
-                : "Select the date of the closed request:";
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -502,47 +406,46 @@ public class AdminService {
         }
 
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+
+        // Используем ваш метод для отправки сообщения с инлайн-клавиатурой
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "requests.closed.select.date", languageCode, keyboard);
     }
 
     public void closeRequest(Long chatId, Long requestId) {
         Help help = helpRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        messageService.getLocalizedMessage("help.request.not.found", userRepository.findLanguageCodeByChatId(chatId), requestId)));
 
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Запрос пользователя:\n" + help.getHelpQuestion() + "\nВаш ответ:\n" + help.getAdminResponse()
-                : "uk".equals(languageCode)
-                ? "Запит користувача:\n" + help.getHelpQuestion() + "\nВаша відповідь:\n" + help.getAdminResponse()
-                : "User request:\n" + help.getHelpQuestion() + "\nYour response:\n" + help.getAdminResponse();
+        // Формируем сообщение с локализацией
+        String message = messageService.getLocalizedMessage("user.request", languageCode, help.getHelpQuestion(), help.getAdminResponse());
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
         keyboard.setKeyboard(rows);
 
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+        // Используем ваш метод для отправки сообщения с инлайн-клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "user.request", languageCode, keyboard, help.getHelpQuestion(), help.getAdminResponse());
     }
 
     private void chooseRecipient(Long chatId, String recipientType) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Подготавливаем текст в зависимости от типа получателя
-        String message = "ru".equals(languageCode)
-                ? recipientType.equals("master") ? "Выберите мастера, чтобы написать:" : "Выберите пользователя, чтобы написать:"
-                : "uk".equals(languageCode)
-                ? recipientType.equals("master") ? "Оберіть майстра, щоб написати:" : "Оберіть користувача, щоб написати:"
-                : recipientType.equals("master") ? "Choose a master to write to:" : "Choose a user to write to:";
+        // Локализованное сообщение для выбора получателя (мастера или пользователя)
+        String messageKey = recipientType.equals("master") ? "choose.master" : "choose.user";
+        String message = messageService.getLocalizedMessage(messageKey, languageCode);
 
         List<?> recipients = recipientType.equals("master")
                 ? masterRepository.findAllByStatus(Master.Status.ACTIVE)
@@ -551,6 +454,7 @@ public class AdminService {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Создаем кнопки для каждого получателя (мастера или пользователя)
         for (Object recipient : recipients) {
             InlineKeyboardButton button = new InlineKeyboardButton();
 
@@ -569,12 +473,14 @@ public class AdminService {
 
         // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+
+        // Отправляем сообщение с инлайн-клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, messageKey, languageCode, keyboard);
     }
 
     public void chooseWriteToMaster(Long chatId) {
@@ -592,18 +498,18 @@ public class AdminService {
     public void initialWriteToRecipient(Long chatId, Long recipientChatId, String recipientType) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Подготавливаем текст в зависимости от типа получателя
-        String message = "ru".equals(languageCode)
-                ? recipientType.equals("master") ? "Напишите ваше сообщение мастеру:" : "Напишите ваше сообщение пользователю:"
-                : "uk".equals(languageCode)
-                ? recipientType.equals("master") ? "Напишіть ваше повідомлення майстру:" : "Напишіть ваше повідомлення користувачу:"
-                : recipientType.equals("master") ? "Write your message to the master:" : "Write your message to the user:";
+        // Подготавливаем ключ для локализованного сообщения в зависимости от типа получателя
+        String messageKey = recipientType.equals("master") ? "write.message.master" : "write.message.user";
+
+        // Получаем локализованное сообщение
+        String message = messageService.getLocalizedMessage(messageKey, languageCode);
 
         // Устанавливаем состояние ожидания ввода сообщения
         userSession.setCurrentState(chatId, recipientType.equals("master")
                 ? "/writing_to_master_" + recipientChatId
                 : "/writing_to_user_" + recipientChatId);
 
+        // Отправляем локализованное сообщение
         messageService.sendMessage(chatId, message);
     }
 
@@ -611,42 +517,34 @@ public class AdminService {
         String senderLanguageCode = userRepository.findLanguageCodeByChatId(senderChatId);
         String recipientLanguageCode = userRepository.findLanguageCodeByChatId(recipientChatId);
 
-        // Формируем сообщение для получателя
-        String messageToRecipient = "ru".equals(recipientLanguageCode)
-                ? "Вам написал админ:\n" + messageText
-                : "uk".equals(recipientLanguageCode)
-                ? "Вам написав адмін:\n" + messageText
-                : "An admin wrote to you:\n" + messageText;
+        // Формируем локализованное сообщение для получателя
+        String messageKey = recipientType.equals("master") ? "admin.wrote.master" : "admin.wrote.user";
 
         // Создаем клавиатуру с кнопкой "Ответить"
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton replyButton = new InlineKeyboardButton();
-        replyButton.setText("ru".equals(recipientLanguageCode)
-                ? "Ответить"
-                : "uk".equals(recipientLanguageCode)
-                ? "Відповісти"
-                : "Reply");
-        replyButton.setCallbackData(recipientType.equals("master") ? "/reply_to_admin_master_" + senderChatId
+        replyButton.setText(messageService.getLocalizedMessage(
+                recipientType.equals("master") ? "reply.master" : "reply.user", recipientLanguageCode));
+        replyButton.setCallbackData(recipientType.equals("master")
+                ? "/reply_to_admin_master_" + senderChatId
                 : "/reply_to_admin_user_" + senderChatId);
 
         keyboard.setKeyboard(List.of(List.of(replyButton)));
 
-        // Отправляем сообщение получателю
-        messageService.sendMessageWithInlineKeyboard(recipientChatId, messageToRecipient, keyboard);
+        // Отправляем локализованное сообщение получателю с инлайн-клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(recipientChatId, messageKey, recipientLanguageCode, keyboard, messageText);
 
         // Подтверждаем отправителю
-        String confirmationMessage = "ru".equals(senderLanguageCode)
-                ? recipientType.equals("master") ? "Ваше сообщение отправлено мастеру." : "Ваше сообщение отправлено пользователю."
-                : "uk".equals(senderLanguageCode)
-                ? recipientType.equals("master") ? "Ваше повідомлення надіслано майстру." : "Ваше повідомлення надіслано користувачу."
-                : recipientType.equals("master") ? "Your message has been sent to the master." : "Your message has been sent to the user.";
-
+        String confirmationMessage = messageService.getLocalizedMessage(
+                recipientType.equals("master") ? "message.sent.master" : "message.sent.user", senderLanguageCode);
         messageService.sendMessage(senderChatId, confirmationMessage);
 
         // Очищаем состояние отправителя
         userSession.clearStates(senderChatId);
         userSession.setCurrentState(senderChatId, recipientType.equals("master") ? "/write_to_master" : "/write_to_client");
         userSession.setPreviousState(senderChatId, "/other_actions");
+
+        // Возвращаем пользователя к соответствующему состоянию
         if (recipientType.equals("master")) {
             chooseWriteToMaster(senderChatId);
         } else {
@@ -661,11 +559,8 @@ public class AdminService {
         List<Users> clientsWithAppointments = appointmentRepository.findDistinctUsersByStatus(Appointment.Status.CONFIRMED);
 
         if (clientsWithAppointments.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? ("TRANSFER".equals(actionType) ? "Нет клиентов с записями для переноса." : "Нет клиентов с записями для отмены.")
-                    : "uk".equals(languageCode)
-                    ? ("TRANSFER".equals(actionType) ? "Немає клієнтів із записами для перенесення." : "Немає клієнтів із записами для скасування.")
-                    : ("TRANSFER".equals(actionType) ? "No clients with appointments available for transfer." : "No clients with appointments available for cancellation.");
+            String messageKey = "TRANSFER".equals(actionType) ? "no.clients.transfer" : "no.clients.cancel";
+            String message = messageService.getLocalizedMessage(messageKey, languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -676,27 +571,23 @@ public class AdminService {
         // Создаем кнопки для каждого клиента
         for (Users client : clientsWithAppointments) {
             InlineKeyboardButton clientButton = new InlineKeyboardButton(client.getFirstName() + " " + client.getLastName());
-            clientButton.setCallbackData(("/admin_select_client_" + actionType + "_" + client.getChatId()));
+            clientButton.setCallbackData("/admin_select_client_" + actionType + "_" + client.getChatId());
             rows.add(List.of(clientButton));
         }
 
         // Добавляем кнопку "Назад"
-        InlineKeyboardButton backButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Назад" :
-                        "uk".equals(languageCode) ? "Назад" : "Back"
-        );
+        InlineKeyboardButton backButton = new InlineKeyboardButton();
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
 
         // Текст сообщения в зависимости от действия
-        String selectClientMessage = "ru".equals(languageCode)
-                ? ("TRANSFER".equals(actionType) ? "Выберите клиента для переноса записи:" : "Выберите клиента для отмены записи:")
-                : "uk".equals(languageCode)
-                ? ("TRANSFER".equals(actionType) ? "Оберіть клієнта для перенесення запису:" : "Оберіть клієнта для скасування запису:")
-                : ("TRANSFER".equals(actionType) ? "Select a client to transfer an appointment:" : "Select a client to cancel an appointment:");
-        messageService.sendMessageWithInlineKeyboard(chatId, selectClientMessage, keyboard);
+        String selectClientMessageKey = "TRANSFER".equals(actionType) ? "select.client.transfer" : "select.client.cancel";
+
+        // Отправляем сообщение с клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, selectClientMessageKey, languageCode, keyboard);
     }
 
     public void adminChooseDateForClient(Long chatId, Long clientChatId, String actionType) {
@@ -705,11 +596,8 @@ public class AdminService {
         List<Appointment> appointments = appointmentRepository.findByChatIdAndStatus(clientChatId, Appointment.Status.CONFIRMED);
 
         if (appointments.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? ("TRANSFER".equals(actionType) ? "Нет записей для переноса." : "Нет записей для отмены.")
-                    : "uk".equals(languageCode)
-                    ? ("TRANSFER".equals(actionType) ? "Немає записів для перенесення." : "Немає записів для скасування.")
-                    : ("TRANSFER".equals(actionType) ? "No appointments available for transfer." : "No appointments available for cancellation.");
+            String messageKey = "TRANSFER".equals(actionType) ? "no.appointments.transfer" : "no.appointments.cancel";
+            String message = messageService.getLocalizedMessage(messageKey, languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -729,21 +617,19 @@ public class AdminService {
             rows.add(List.of(dateButton));
         }
 
-        InlineKeyboardButton backButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Назад" :
-                        "uk".equals(languageCode) ? "Назад" : "Back"
-        );
+        // Кнопка "Назад"
+        InlineKeyboardButton backButton = new InlineKeyboardButton();
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
 
-        String selectDateMessage = "ru".equals(languageCode)
-                ? ("TRANSFER".equals(actionType) ? "Выберите дату записи клиента для переноса:" : "Выберите дату записи клиента для отмены:")
-                : "uk".equals(languageCode)
-                ? ("TRANSFER".equals(actionType) ? "Оберіть дату запису клієнта для перенесення:" : "Оберіть дату запису клієнта для скасування:")
-                : ("TRANSFER".equals(actionType) ? "Select a client's appointment date for transfer:" : "Select a client's appointment date for cancellation:");
-        messageService.sendMessageWithInlineKeyboard(chatId, selectDateMessage, keyboard);
+        // Формируем текст сообщения для выбора даты
+        String selectDateMessageKey = "TRANSFER".equals(actionType) ? "select.date.transfer" : "select.date.cancel";
+
+        // Отправляем сообщение с инлайн-клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, selectDateMessageKey, languageCode, keyboard);
     }
 
     public void adminChooseTimeForDate(Long chatId, Long clientChatId, LocalDate date, String actionType) {
@@ -755,11 +641,8 @@ public class AdminService {
                 .collect(Collectors.toList());
 
         if (appointments.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Нет доступных временных слотов для выбранной даты."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних часових слотів для обраної дати."
-                    : "No time slots available for the selected date.";
+            String messageKey = "TRANSFER".equals(actionType) ? "no.time.slots.transfer" : "no.time.slots.cancel";
+            String message = messageService.getLocalizedMessage(messageKey, languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -767,27 +650,26 @@ public class AdminService {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Создаем кнопки для каждого временного слота
         for (Appointment appointment : appointments) {
             InlineKeyboardButton timeButton = new InlineKeyboardButton(appointment.getAppointmentDate().toLocalTime().toString());
-            timeButton.setCallbackData(("/admin_select_time_" + actionType + "_" + appointment.getId() + "_" + date + "_" + clientChatId));
+            timeButton.setCallbackData("/admin_select_time_" + actionType + "_" + appointment.getId() + "_" + date + "_" + clientChatId);
             rows.add(List.of(timeButton));
         }
 
-        InlineKeyboardButton backButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Назад" :
-                        "uk".equals(languageCode) ? "Назад" : "Back"
-        );
+        // Кнопка "Назад"
+        InlineKeyboardButton backButton = new InlineKeyboardButton();
+        backButton.setText(messageService.getLocalizedMessage("requests.back", languageCode));
         backButton.setCallbackData("/back");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
 
-        String selectTimeMessage = "ru".equals(languageCode)
-                ? ("TRANSFER".equals(actionType) ? "Выберите время записи клиента для переноса:" : "Выберите время записи клиента для отмены:")
-                : "uk".equals(languageCode)
-                ? ("TRANSFER".equals(actionType) ? "Оберіть час запису клієнта для перенесення:" : "Оберіть час запису клієнта для скасування:")
-                : ("TRANSFER".equals(actionType) ? "Select a client's appointment time for transfer:" : "Select a client's appointment time for cancellation:");
-        messageService.sendMessageWithInlineKeyboard(chatId, selectTimeMessage, keyboard);
+        // Текст сообщения для выбора времени
+        String selectTimeMessageKey = "TRANSFER".equals(actionType) ? "select.time.transfer" : "select.time.cancel";
+
+        // Отправляем сообщение с инлайн-клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, selectTimeMessageKey, languageCode, keyboard);
     }
 
     public void adminConfirmAction(Long chatId, Long appointmentId, String actionType) {
@@ -797,49 +679,34 @@ public class AdminService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String messageKey = "appointment.not.found";
+            String message = messageService.getLocalizedMessage(messageKey, languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
         // Формируем сообщение подтверждения в зависимости от типа действия
-        String confirmationMessage = "ru".equals(languageCode)
-                ? ("TRANSFER".equals(actionType)
-                ? "Вы выбрали запись клиента на " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + ". Хотите перенести?"
-                : "Вы выбрали запись клиента на " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + ". Хотите отменить?")
-                : "uk".equals(languageCode)
-                ? ("TRANSFER".equals(actionType)
-                ? "Ви вибрали запис клієнта на " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + ". Бажаєте перенести?"
-                : "Ви вибрали запис клієнта на " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + ". Бажаєте скасувати?")
-                : ("TRANSFER".equals(actionType)
-                ? "You selected the client's appointment on " + appointment.getAppointmentDate().toLocalDate() + " at " + appointment.getAppointmentDate().toLocalTime() + ". Would you like to transfer?"
-                : "You selected the client's appointment on " + appointment.getAppointmentDate().toLocalDate() + " at " + appointment.getAppointmentDate().toLocalTime() + ". Would you like to cancel?");
+        String confirmationMessageKey = "TRANSFER".equals(actionType)
+                ? "confirm.transfer"
+                : "confirm.cancel";
 
         // Формируем клавиатуру
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
 
         // Кнопка подтверждения
+        String confirmButtonLabelKey = "TRANSFER".equals(actionType)
+                ? "confirm.transfer.yes"
+                : "confirm.cancel.yes";
         InlineKeyboardButton confirmButton = new InlineKeyboardButton(
-                "ru".equals(languageCode)
-                        ? ("TRANSFER".equals(actionType) ? "Да, перенести запись" : "Да, отменить запись")
-                        : "uk".equals(languageCode)
-                        ? ("TRANSFER".equals(actionType) ? "Так, перенести запис" : "Так, скасувати запис")
-                        : ("TRANSFER".equals(actionType) ? "Yes, Transfer Appointment" : "Yes, Cancel Appointment")
+                messageService.getLocalizedMessage(confirmButtonLabelKey, languageCode)
         );
         confirmButton.setCallbackData("/admin_confirm_action_" + actionType + "_" + appointmentId +
                 "_" + appointment.getAppointmentDate().toLocalDate() + "_" + appointment.getChatId());
 
         // Кнопка отказа
+        String noButtonLabelKey = "confirm.no";
         InlineKeyboardButton noButton = new InlineKeyboardButton(
-                "ru".equals(languageCode)
-                        ? "Нет, оставить"
-                        : "uk".equals(languageCode)
-                        ? "Ні, залишити"
-                        : "No, keep"
+                messageService.getLocalizedMessage(noButtonLabelKey, languageCode)
         );
         noButton.setCallbackData("/admin_select_date_" + actionType + "_" + appointment.getChatId()
                 + "_" + appointment.getAppointmentDate().toLocalDate());
@@ -851,10 +718,9 @@ public class AdminService {
         userSession.setCurrentState(chatId, "/admin_confirm_action_" + actionType + "_" + appointmentId);
         userSession.setPreviousState(chatId, "/admin_select_time_" + actionType + "_" + appointmentId);
 
-        // Отправляем сообщение
-        messageService.sendMessageWithInlineKeyboard(chatId, confirmationMessage, keyboard);
+        // Отправляем сообщение с клавишами
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, confirmationMessageKey, languageCode, keyboard, appointment.getAppointmentDate().toLocalDate(), appointment.getAppointmentDate().toLocalTime());
     }
-
 
     public void adminChooseNewsData(Long chatId, Long appointmentId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
@@ -862,27 +728,19 @@ public class AdminService {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.not.found", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-// Сохраняем идентификатор записи в сессии пользователя, чтобы использовать его на следующих шагах
+        // Сохраняем идентификатор записи в сессии пользователя, чтобы использовать его на следующих шагах
         userSession.setAppointmentToTransfer(chatId, appointmentId);
 
-// Запрашиваем выбор новой даты
-        String selectDateMessage = "ru".equals(languageCode)
-                ? "Пожалуйста, выберите новую дату для записи:"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, оберіть нову дату для запису:"
-                : "Please select a new date for the appointment:";
+        // Запрашиваем выбор новой даты
+        String selectDateMessage = messageService.getLocalizedMessage("select.new.date", languageCode);
         messageService.sendMessage(chatId, selectDateMessage);
 
-// Показать доступные даты для этого мастера
+        // Показать доступные даты для этого мастера
         showAvailableDatesAdmin(chatId, appointment.getMaster().getId());
     }
 
@@ -903,11 +761,7 @@ public class AdminService {
                 .collect(Collectors.toList());
 
         if (availableDates.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Нет доступных дат для выбранного мастера."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних дат для обраного майстра."
-                    : "No available dates for the selected master.";
+            String message = messageService.getLocalizedMessage("no.available.dates", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -920,12 +774,8 @@ public class AdminService {
 
         keyboard.setKeyboard(rows);
 
-        String selectDateMessage = "ru".equals(languageCode)
-                ? "Выберите дату:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату:"
-                : "Select a date:";
-        messageService.sendMessageWithInlineKeyboard(chatId, selectDateMessage, keyboard);
+        // Сообщение для выбора даты
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "select.date", languageCode, keyboard);
     }
 
     public void handleTransferDateSelectionAdmin(Long chatId, Long dateId) {
@@ -947,12 +797,8 @@ public class AdminService {
         }
 
         keyboard.setKeyboard(rows);
-        String selectTimeMessage = "ru".equals(languageCode)
-                ? "Выберите время:"
-                : "uk".equals(languageCode)
-                ? "Оберіть час:"
-                : "Select a time:";
-        messageService.sendMessageWithInlineKeyboard(chatId, selectTimeMessage, keyboard);
+
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "select.time", languageCode, keyboard);
     }
 
     // Метод для обработки выбора времени и окончательного подтверждения переноса
@@ -961,11 +807,7 @@ public class AdminService {
 
         Long appointmentId = userSession.getAppointmentToTransfer(chatId);
         if (appointmentId == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись для переноса не выбрана."
-                    : "uk".equals(languageCode)
-                    ? "Запис для перенесення не обрано."
-                    : "No appointment selected for transfer.";
+            String message = messageService.getLocalizedMessage("appointment.not.selected.for.transfer", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -974,37 +816,24 @@ public class AdminService {
         TimeSlot newTimeSlot = timeSlotRepository.findById(timeSlotId).orElse(null);
 
         if (appointment == null || newTimeSlot == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Произошла ошибка при переносе. Пожалуйста, попробуйте снова."
-                    : "uk".equals(languageCode)
-                    ? "Сталася помилка під час перенесення. Будь ласка, спробуйте ще раз."
-                    : "An error occurred during transfer. Please try again.";
+            String message = messageService.getLocalizedMessage("error.transfer.failed", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
 
-// Сохраняем выбранный timeSlotId в сессии пользователя
+        // Сохраняем выбранный timeSlotId в сессии пользователя
         userSession.setSelectedTimeSlot(chatId, String.valueOf(timeSlotId));
 
-// Подтверждение переноса
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы переносите запись для клиента" + appointment.getUsers().getFirstName() +
-                " " + appointment.getUsers().getLastName() + " на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nВремя: " + newTimeSlot.getTime() + "\n\nПодтвердить перенос?"
-                : "uk".equals(languageCode)
-                ? "Ви переносите запис для клієнту" + appointment.getUsers().getFirstName() +
-                " " + appointment.getUsers().getLastName() + " на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nЧас: " + newTimeSlot.getTime() + "\n\nПідтвердити перенесення?"
-                : "You are transferring the appointment for client's" + appointment.getUsers().getFirstName() +
-                " " + appointment.getUsers().getLastName() + "to:\nDate: " + newTimeSlot.getAvailableDate().getDate() + "\nTime: " + newTimeSlot.getTime() + "\n\nConfirm transfer?";
+        // Подтверждение переноса
+        String confirmationMessage = messageService.getLocalizedMessage("transfer.confirm", languageCode,
+                appointment.getUsers().getFirstName(), appointment.getUsers().getLastName(),
+                newTimeSlot.getAvailableDate().getDate(), newTimeSlot.getTime());
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        InlineKeyboardButton confirmButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Подтвердить перенос" : "uk".equals(languageCode) ? "Підтвердити перенесення" : "Confirm Transfer"
-        );
+        InlineKeyboardButton confirmButton = new InlineKeyboardButton(messageService.getLocalizedMessage("confirm.transfer.button", languageCode));
         confirmButton.setCallbackData("/admin_transfer_final_" + appointmentId + "_" + dateId);
 
-        InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                "ru".equals(languageCode) ? "Отменить перенос" : "uk".equals(languageCode) ? "Скасувати перенесення" : "Cancel Transfer"
-        );
+        InlineKeyboardButton cancelButton = new InlineKeyboardButton(messageService.getLocalizedMessage("cancel.transfer.button", languageCode));
         cancelButton.setCallbackData("/reschedule_appointment");
 
         List<InlineKeyboardButton> row = List.of(confirmButton, cancelButton);
@@ -1021,11 +850,7 @@ public class AdminService {
         TimeSlot newTimeSlot = timeSlotRepository.findById(timeSlotId).orElse(null);
 
         if (appointment == null || newTimeSlot == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Перенос не удался. Пожалуйста, попробуйте снова."
-                    : "uk".equals(languageCode)
-                    ? "Перенесення не вдалося. Будь ласка, спробуйте ще раз."
-                    : "Transfer failed. Please try again.";
+            String message = messageService.getLocalizedMessage("transfer.failed", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -1054,50 +879,41 @@ public class AdminService {
         newTimeSlot.setBooked(true);
         timeSlotRepository.save(newTimeSlot);
 
+        // Получаем локализованное имя услуги в зависимости от языка
+        String serviceName = getServiceNameByLanguage(appointment.getServices(), languageCode);
+
         // Уведомляем клиента о переносе
-        String userNotification = "ru".equals(languageCode)
-                ? "Ваша запись на услугу " + appointment.getServices().getNameRu() +
-                " перенесена на:\nДата: " + newTimeSlot.getAvailableDate().getDate() +
-                "\nВремя: " + newTimeSlot.getTime() + "."
-                : "uk".equals(languageCode)
-                ? "Ваш запис на послугу " + appointment.getServices().getNameUk() +
-                " перенесено на:\nДата: " + newTimeSlot.getAvailableDate().getDate() +
-                "\nЧас: " + newTimeSlot.getTime() + "."
-                : "Your appointment for " + appointment.getServices().getNameEn() +
-                " has been rescheduled to:\nDate: " + newTimeSlot.getAvailableDate().getDate() +
-                "\nTime: " + newTimeSlot.getTime() + ".";
+        String userNotification = messageService.getLocalizedMessage("appointment.rescheduled", languageCode, serviceName,
+                newTimeSlot.getAvailableDate().getDate(), newTimeSlot.getTime());
         messageService.sendMessage(chatId, userNotification);
 
         // Уведомляем мастера о переносе
-        Long masterChatId = appointment.getMaster().getChatId(); // Предполагаем, что у мастера есть поле с ID чата
+        Long masterChatId = appointment.getMaster().getChatId();
         if (masterChatId != null) {
-            // Получаем информацию о пользователе
-            Users users = userRepository.findByChatId(chatId);
-            String clientName = (users != null) ? users.getFirstName() + " " + users.getLastName() : "Unknown";
+            Users client = userRepository.findByChatId(chatId);
+            String clientName = (client != null) ? client.getFirstName() + " " + client.getLastName() : "Unknown";
 
-            String languageCodeMaster = userRepository.findLanguageCodeByChatId(masterChatId);
-            String masterNotification = "ru".equals(languageCodeMaster)
-                    ? "Запись для клиента " + clientName +
-                    " на услугу " + appointment.getServices().getNameRu() +
-                    " перенесена на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nВремя: " + newTimeSlot.getTime() + "."
-                    : "uk".equals(languageCodeMaster)
-                    ? "Запис для клієнта " + clientName +
-                    " на послугу " + appointment.getServices().getNameUk() +
-                    " перенесено на:\nДата: " + newTimeSlot.getAvailableDate().getDate() + "\nЧас: " + newTimeSlot.getTime() + "."
-                    : "The appointment for " + appointment.getServices().getNameEn() +
-                    " with client " + clientName +
-                    " has been rescheduled to:\nDate: " + newTimeSlot.getAvailableDate().getDate() + "\nTime: " + newTimeSlot.getTime() + ".";
-
+            String masterNotification = messageService.getLocalizedMessage("appointment.rescheduled.master", languageCode,
+                    clientName, serviceName, newTimeSlot.getAvailableDate().getDate(), newTimeSlot.getTime());
             messageService.sendMessage(masterChatId, masterNotification);
         }
 
         // Сообщение администратору
-        String adminMessage = "ru".equals(languageCode)
-                ? "Запись успешно перенесена."
-                : "uk".equals(languageCode)
-                ? "Запис успішно перенесено."
-                : "Appointment successfully transferred.";
+        String adminMessage = messageService.getLocalizedMessage("appointment.successfully.transferred", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, adminMessage, adminButtons.getManageAppointmentsKeyboard(chatId));
+    }
+
+    // Метод для получения локализованного имени услуги
+    private String getServiceNameByLanguage(Services service, String languageCode) {
+        switch (languageCode) {
+            case "ru":
+                return service.getNameRu();
+            case "uk":
+                return service.getNameUk();
+            case "en":
+            default:
+                return service.getNameEn();
+        }
     }
 
     public void cancelAppointment(Long chatId, Long appointmentId) {
@@ -1109,11 +925,7 @@ public class AdminService {
         String languageCodeClient = userRepository.findLanguageCodeByChatId(clientChatId);
 
         if (appointment == null) {
-            String message = "ru".equals(languageCode)
-                    ? "Запись не найдена."
-                    : "uk".equals(languageCode)
-                    ? "Запис не знайдено."
-                    : "Appointment not found.";
+            String message = messageService.getLocalizedMessage("appointment.not.found", languageCode);
             messageService.sendMessage(chatId, message);
             return;
         }
@@ -1132,11 +944,8 @@ public class AdminService {
         }
 
         // Сообщение об успешной отмене для клиента
-        String clientSuccessMessage = "ru".equals(languageCodeClient)
-                ? "Ваша запись на " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + " была успешно отменена."
-                : "uk".equals(languageCodeClient)
-                ? "Ваш запис на " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + " був успішно скасований."
-                : "Your appointment on " + appointment.getAppointmentDate().toLocalDate() + " at " + appointment.getAppointmentDate().toLocalTime() + " has been successfully canceled.";
+        String clientSuccessMessage = messageService.getLocalizedMessage("appointment.canceled.client", languageCodeClient,
+                appointment.getAppointmentDate().toLocalDate(), appointment.getAppointmentDate().toLocalTime());
         messageService.sendMessage(clientChatId, clientSuccessMessage);
 
         // Уведомление для мастера
@@ -1147,20 +956,12 @@ public class AdminService {
             String appointmentDate = appointment.getAppointmentDate().toLocalDate().toString();
             String appointmentTime = appointment.getAppointmentDate().toLocalTime().toString();
 
-            String masterNotification = "ru".equals(languageCodeMaster)
-                    ? "Клиент " + clientName + " отменил запись на " + appointmentDate + " в " + appointmentTime + "."
-                    : "uk".equals(languageCodeMaster)
-                    ? "Клієнт " + clientName + " скасував запис на " + appointmentDate + " о " + appointmentTime + "."
-                    : "Client " + clientName + " has canceled the appointment on " + appointmentDate + " at " + appointmentTime + ".";
-
+            String masterNotification = messageService.getLocalizedMessage("appointment.canceled.master", languageCodeMaster,
+                    clientName, appointmentDate, appointmentTime);
             messageService.sendMessage(masterChatId, masterNotification);
         }
 
-        String successMessage = "ru".equals(languageCode)
-                ? "Запись успешно отменена."
-                : "uk".equals(languageCode)
-                ? "Запис успішно скасовано."
-                : "Appointment successfully cancelled.";
+        String successMessage = messageService.getLocalizedMessage("appointment.canceled.success", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, successMessage, adminButtons.getManageAppointmentsKeyboard(chatId));
     }
 
@@ -1174,17 +975,13 @@ public class AdminService {
             List<AvailableDate> availableDates = availableDateService.getAvailableDatesForMaster(master.getId());
 
             availableDates = availableDates.stream()
-                    .filter(date -> date.getDate().isAfter(LocalDate.now()))  // Исключаем прошлое и сегодняшнюю дату
-                    .filter(date -> availableDateService.getTimeSlotsForAvailableDate(date.getId()).stream().anyMatch(slot -> !slot.isBooked()))  // Оставляем только даты с доступными временными слотами
+                    .filter(date -> date.getDate().isAfter(LocalDate.now()))  // Exclude past and today’s dates
+                    .filter(date -> availableDateService.getTimeSlotsForAvailableDate(date.getId()).stream().anyMatch(slot -> !slot.isBooked()))  // Keep only dates with available slots
                     .collect(Collectors.toList());
 
-            // Если нет свободных дат, отправляем сообщение с номером телефона мастера
+            // If there are no available dates, send a message with the master’s phone number
             if (availableDates.isEmpty()) {
-                String message = "ru".equals(languageCode)
-                        ? "У мастера " + master.getName() + " в настоящее время нет доступных дат. Пожалуйста, свяжитесь с ним по телефону: " + master.getPhoneNumber()
-                        : "uk".equals(languageCode)
-                        ? "У майстра " + master.getName() + " зараз немає доступних дат. Будь ласка, зв'яжіться з ним за телефоном: " + master.getPhoneNumber()
-                        : "Master " + master.getName() + " currently has no available dates. Please contact them at: " + master.getPhoneNumber();
+                String message = messageService.getLocalizedMessage(languageCode, "no.available.dates", master.getName(), master.getPhoneNumber());
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/appointments_manage");
                 userSession.setPreviousState(chatId, "/other_actions");
@@ -1195,16 +992,18 @@ public class AdminService {
                 return;
             }
 
+            // Create a button for the master
             InlineKeyboardButton button = new InlineKeyboardButton(master.getName());
             button.setCallbackData("/admin_select_master_" + master.getId());
             rows.add(List.of(button));
         }
 
+        // Send the list of masters
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Выберите мастера:" :
-                "uk".equals(languageCode) ? "Оберіть майстра:" :
-                        "Choose a master:", keyboard);
+        String message = messageService.getLocalizedMessage(languageCode, "master.choose");
+        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
+
 
     protected void showServiceSelection(Long chatId, Long masterId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
@@ -1213,17 +1012,20 @@ public class AdminService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         for (Services service : services) {
-            InlineKeyboardButton button = new InlineKeyboardButton("ru".equals(languageCode) ? service.getNameRu() :
-                    "uk".equals(languageCode) ? service.getNameUk() :
-                            service.getNameEn());
+            // Get the localized service name based on the language code
+            String serviceName = messageService.getLocalizedServiceName(service, languageCode);
+
+            InlineKeyboardButton button = new InlineKeyboardButton(serviceName);
             button.setCallbackData("/admin_service_" + service.getId());
             rows.add(List.of(button));
         }
 
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Выберите услугу:" :
-                "uk".equals(languageCode) ? "Оберіть послугу:" :
-                        "Choose a service:", keyboard);
+
+        // Get the localized message for selecting a service
+        String message = messageService.getLocalizedMessage(languageCode, "choose.service");
+
+        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
     protected void showDateSelection(Long chatId, Long masterId) {
@@ -1232,20 +1034,19 @@ public class AdminService {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        // Фильтруем даты, оставляя только те, где есть незанятые временные слоты
+        // Filter available dates (those with free time slots and after today's date)
         dates = dates.stream()
-                .filter(date -> date.getDate().isAfter(LocalDate.now()))  // Исключаем прошлое и сегодняшнюю дату
-                .filter(date -> availableDateService.getTimeSlotsForAvailableDate(date.getId()).stream().anyMatch(slot -> !slot.isBooked()))  // Оставляем только даты с доступными временными слотами
+                .filter(date -> date.getDate().isAfter(LocalDate.now())) // Exclude past and today
+                .filter(date -> availableDateService.getTimeSlotsForAvailableDate(date.getId())
+                        .stream().anyMatch(slot -> !slot.isBooked())) // Keep only dates with available time slots
                 .collect(Collectors.toList());
 
         if (dates.isEmpty()) {
-            String message = "ru".equals(languageCode)
-                    ? "Нет доступных дат для выбранного мастера."
-                    : "uk".equals(languageCode)
-                    ? "Немає доступних дат для обраного майстра."
-                    : "No available dates for the selected master.";
-
+            // Use a helper method for localized message
+            String message = messageService.getLocalizedMessage(languageCode, "no.available.dates.for.master");
             messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getManageAppointmentsKeyboard(chatId));
+
+            // Clear session data and set current state
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/appointments_manage");
             userSession.setPreviousState(chatId, "/other_actions");
@@ -1254,6 +1055,7 @@ public class AdminService {
             return;
         }
 
+        // Create a button for each available date
         for (AvailableDate date : dates) {
             InlineKeyboardButton button = new InlineKeyboardButton(date.getDate().toString());
             button.setCallbackData("/admin_date_" + date.getId());
@@ -1261,33 +1063,32 @@ public class AdminService {
         }
 
         keyboard.setKeyboard(rows);
-        messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Выберите дату:" :
-                "uk".equals(languageCode) ? "Оберіть дату:" :
-                        "Choose a date:", keyboard);
+
+        // Use the helper method to get the localized message for choosing a date
+        String message = messageService.getLocalizedMessage(languageCode, "select.date");
+        messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
     protected void showTimeSelection(Long chatId, Long dateId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         List<TimeSlot> slots = availableDateService.getTimeSlotsForAvailableDate(dateId);
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
 
+        // Create keyboard for available time slots
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = slots.stream()
-                .filter(slot -> !slot.isBooked())
+                .filter(slot -> !slot.isBooked()) // Only show available time slots
                 .map(slot -> {
                     InlineKeyboardButton button = new InlineKeyboardButton(slot.getTime().toString());
-                    userSession.setSelectedTimeSlot(chatId, String.valueOf(slot.getId()));
+                    userSession.setSelectedTimeSlot(chatId, String.valueOf(slot.getId())); // Save selected slot in session
                     button.setCallbackData("/admin_time_" + slot.getId());
-                    return List.of(button);
-                }).collect(Collectors.toList());
+                    return List.of(button); // Wrap the button in a list (to match the keyboard format)
+                })
+                .collect(Collectors.toList());
 
         keyboard.setKeyboard(rows);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите время:"
-                : "uk".equals(languageCode)
-                ? "Оберіть час:"
-                : "Select a time:";
-
+        // Use helper method to get localized message for time selection
+        String message = messageService.getLocalizedMessage(languageCode, "select.time");
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -1301,9 +1102,7 @@ public class AdminService {
 
         TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId).orElse(null);
         if (timeSlot == null) {
-            messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Ошибка: неверное время." :
-                    "uk".equals(languageCode) ? "Помилка: невірний час." :
-                            "Error: invalid time.", adminButtons.getManageAppointmentsKeyboard(chatId));
+            messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "error.invalid_time", languageCode, adminButtons.getManageAppointmentsKeyboard(chatId));
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/appointments_manage");
             userSession.setPreviousState(chatId, "/other_actions");
@@ -1326,68 +1125,41 @@ public class AdminService {
         timeSlot.setBooked(true);
         timeSlotRepository.save(timeSlot);
 
-        // Сообщение об успешной отмене для клиента
+        // Сообщение об успешной записи для клиента
         if (userChatId != null) {
-            String languageCodeClient = userRepository.findLanguageCodeByChatId(userChatId);
-            String clientSuccessMessage = "ru".equals(languageCodeClient)
-                    ? "Ваша запись на " + appointment.getAppointmentDate().toLocalDate() + " в " + appointment.getAppointmentDate().toLocalTime() + " была успешно создана."
-                    : "uk".equals(languageCodeClient)
-                    ? "Ваш запис на " + appointment.getAppointmentDate().toLocalDate() + " о " + appointment.getAppointmentDate().toLocalTime() + " був успішно створено."
-                    : "Your appointment on " + appointment.getAppointmentDate().toLocalDate() + " at " + appointment.getAppointmentDate().toLocalTime() + " has been successfully booked.";
-            messageService.sendMessage(userChatId, clientSuccessMessage);
+            sendClientSuccessMessage(userChatId, appointment, languageCode);
         }
 
         // Уведомление для мастера
-        Long masterChatId = masterRepository.findById(masterId).get().getChatId();
-        String languageCodeMaster = userRepository.findLanguageCodeByChatId(masterChatId);
-        if (masterChatId != null) {
-            Users client = userRepository.findByChatId(chatId);
-            String clientName = client != null ? client.getFirstName() + " " + client.getLastName() : "Unknown";
-            String appointmentDate = appointment.getAppointmentDate().toLocalDate().toString();
-            String appointmentTime = appointment.getAppointmentDate().toLocalTime().toString();
-            String serviceName = serviceRepository.findById(serviceId)
-                    .map(service -> {
-                        if ("ru".equals(languageCode)) {
-                            return service.getNameRu();
-                        } else if ("uk".equals(languageCode)) {
-                            return service.getNameUk();
-                        } else {
-                            return service.getNameEn();
-                        }
-                    })
-                    .orElse("Unknown");
+        sendMasterNotification(masterId, appointment, languageCode);
 
+        // Сообщение для администратора
+        messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "appointment.successfully_created", languageCode, adminButtons.getManageAppointmentsKeyboard(chatId));
 
-            String masterNotification = "ru".equals(languageCodeMaster)
-                    ? "Новая запись на прием:\n" +
-                    "Клиент: " + clientName + "\n" +
-                    "Услуга: " + serviceName + "\n" +
-                    "Дата: " + appointmentDate + "\n" +
-                    "Время: " + appointmentTime
-                    : "uk".equals(languageCodeMaster)
-                    ? "Нове бронювання:\n" +
-                    "Клієнт: " + clientName + "\n" +
-                    "Послуга: " + serviceName + "\n" +
-                    "Дата: " + appointmentDate + "\n" +
-                    "Час: " + appointmentTime
-                    : "New appointment booked:\n" +
-                    "Client: " + clientName + "\n" +
-                    "Service: " + serviceName + "\n" +
-                    "Date: " + appointmentDate + "\n" +
-                    "Time: " + appointmentTime;
-            ;
-
-            messageService.sendMessage(masterChatId, masterNotification);
-        }
-
-        messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode) ? "Запись успешно создана!" :
-                "uk".equals(languageCode) ? "Запис успішно створено!" :
-                        "Appointment successfully created!", adminButtons.getManageAppointmentsKeyboard(chatId));
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/appointments_manage");
         userSession.setPreviousState(chatId, "/other_actions");
         userSession.clearSession(chatId);
         userSession.clearTempData(chatId);
+    }
+
+    private void sendClientSuccessMessage(Long userChatId, Appointment appointment, String languageCode) {
+        String clientSuccessMessage = messageService.getLocalizedMessage("appointment.booked_successfully", languageCode, appointment.getAppointmentDate().toLocalDate(), appointment.getAppointmentDate().toLocalTime());
+        messageService.sendMessage(userChatId, clientSuccessMessage);
+    }
+
+    private void sendMasterNotification(Long masterId, Appointment appointment, String languageCode) {
+        Long masterChatId = masterRepository.findById(masterId).get().getChatId();
+        Users client = userRepository.findByChatId(appointment.getChatId());
+        String clientName = client != null ? client.getFirstName() + " " + client.getLastName() : "Unknown";
+        String appointmentDate = appointment.getAppointmentDate().toLocalDate().toString();
+        String appointmentTime = appointment.getAppointmentDate().toLocalTime().toString();
+        String serviceName = serviceRepository.findById(appointment.getServices().getId())
+                .map(service -> messageService.getLocalizedServiceName(service, languageCode))
+                .orElse("Unknown");
+
+        String masterNotification = messageService.getLocalizedMessage("master.new_appointment", languageCode, clientName, serviceName, appointmentDate, appointmentTime);
+        messageService.sendMessage(masterChatId, masterNotification);
     }
 }
 

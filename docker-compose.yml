@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:8
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 123671189Sasha
+      MYSQL_DATABASE: TelegramBotNailsBooking
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: 123671189Sasha
+    ports:
+      - "3307:3306"
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  telegram-bot:
+    image: telegram-bot-nails:latest
+    container_name: telegram-bot
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/TelegramBotNailsBooking
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: 123671189Sasha
+      BOT_TOKEN: "7620720012:AAGXBdShOB8tjtSMdbNLkbx0bQd0LElVkMs"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - bot-network
+
+networks:
+  bot-network:

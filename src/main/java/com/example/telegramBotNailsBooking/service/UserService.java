@@ -52,23 +52,29 @@ public class UserService {
 
     public boolean isAdmin(Long chatId) {
         Users users = userRepository.findByChatId(chatId);
-        return users != null && users.getRole() == Users.Role.ADMIN;
+        return users != null && users.getRole().equals(Users.Role.ADMIN);
     }
 
-    protected void startCommand(Long chatId, Update update) {
+    public void startCommand(Long chatId, Update update) {
         User user = update.getMessage().getFrom();
         String languageCode = user.getLanguageCode();
+
+        if (update == null) {
+            userSession.clearStates(chatId);
+            userSession.clearSession(chatId);
+            userSession.setCurrentState(chatId, "/main_menu");
+
+            String mainMenuMessage = messageService.getLocalizedMessage("main_menu", languageCode);
+            messageService.sendMessageWithInlineKeyboard(chatId, mainMenuMessage, autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            return;
+        }
 
         if (userRepository.findByChatId(chatId) != null) {
             userSession.clearStates(chatId);
             userSession.clearSession(chatId);
             userSession.setCurrentState(chatId, "/main_menu");
 
-            String mainMenuMessage = "ru".equals(languageCode)
-                    ? "Главное меню"
-                    : "uk".equals(languageCode)
-                    ? "Головне меню"
-                    : "Main Menu";
+            String mainMenuMessage = messageService.getLocalizedMessage("main_menu", languageCode);
             messageService.sendMessageWithInlineKeyboard(chatId, mainMenuMessage, autUserButtons.getAuthenticatedInlineKeyboard(chatId));
             return;
         }
@@ -78,32 +84,23 @@ public class UserService {
 
         if (update.getMessage() == null || update.getMessage().getFrom() == null) {
             // Обработка случая, когда update.getMessage() или getFrom() равно null
-            String errorMessage = "ru".equals(languageCode)
-                    ? "Ошибка: Не удалось обработать этот запрос."
-                    : "uk".equals(languageCode)
-                    ? "Помилка: Не вдалося обробити цей запит."
-                    : "Error: Unable to process this request.";
+            String errorMessage = messageService.getLocalizedMessage("error_message", languageCode);
             messageService.sendMessage(chatId, errorMessage);
             return;
         }
 
+        String welcomeMessage;
         if ("en".equals(languageCode)) {
-            String message = "Hello! Welcome to our appointment booking bot. " +
-                    "Here, you can easily schedule an appointment for your desired service. " +
-                    "Simply follow the prompts, and we’ll guide you through the booking process. Let's get started!";
-            messageService.sendMessage(chatId, message);
+            welcomeMessage = messageService.getLocalizedMessage("welcome_message_en", languageCode);
+            messageService.sendMessage(chatId, welcomeMessage);
             personalData(chatId, "en");
         } else if ("ru".equals(languageCode)) {
-            String message = "Здравствуйте! Добро пожаловать в наш бот для записи на процедуры." +
-                    " Здесь вы можете легко записаться на нужную услугу." +
-                    " Следуйте подсказкам, и мы поможем вам пройти процесс записи. Начнем!";
-            messageService.sendMessage(chatId, message);
+            welcomeMessage = messageService.getLocalizedMessage("welcome_message_ru", languageCode);
+            messageService.sendMessage(chatId, welcomeMessage);
             personalData(chatId, "ru");
         } else if ("uk".equals(languageCode)) {
-            String message = "Привіт! Вітаємо у нашому боті для запису на процедури." +
-                    " Тут ви зможете легко записатися на бажану послугу." +
-                    " Просто дотримуйтесь підказок, і ми допоможемо вам пройти процес запису. Почнемо!";
-            messageService.sendMessage(chatId, message);
+            welcomeMessage = messageService.getLocalizedMessage("welcome_message_uk", languageCode);
+            messageService.sendMessage(chatId, welcomeMessage);
             personalData(chatId, "uk");
         } else {
             messageService.sendMessage(chatId, "Please choose a language.");
@@ -111,7 +108,7 @@ public class UserService {
         }
     }
 
-    private void chooseLanguage(Long chatId) {
+    public void chooseLanguage(Long chatId) {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
@@ -133,47 +130,36 @@ public class UserService {
         messageService.sendMessageWithInlineKeyboard(chatId, "Please select your language:", inlineKeyboardMarkup);
     }
 
-    protected void personalData(Long chatId, String languageCode) {
-        String message;
-        if ("ru".equals(languageCode)) {
-            message = "Для продолжения работы с ботом просим вас дать согласие на обработку персональных данных. " +
-                    "Эта информация будет использоваться исключительно для управления вашей записью. " +
-                    "Вы согласны на обработку персональных данных?";
-        } else if ("uk".equals(languageCode)) {
-            message = "Для продовження роботи з ботом просимо надати вашу згоду на обробку персональних даних." +
-                    " Ця інформація буде використовуватись виключно для управління вашим записом." +
-                    " Чи погоджуєтесь ви на обробку персональних даних?";
-        } else {
-            message = "To continue using the bot, we kindly ask for your consent to process your personal data. " +
-                    "This information will only be used to manage your appointment. " +
-                    "Do you consent to the processing of your personal data?";
-        }
+    public void personalData(Long chatId, String languageCode) {
+        // Получаем локализованное сообщение для запроса согласия
+        String message = messageService.getLocalizedMessage("personal_data_consent", languageCode);
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Кнопка для согласия
         InlineKeyboardButton consentButton = new InlineKeyboardButton();
-        consentButton.setText(
-                "ru".equals(languageCode) ? "Да" : "uk".equals(languageCode) ? "Так" : "Yes"
-        );
+        consentButton.setText(messageService.getLocalizedMessage("consent_yes", languageCode));
         consentButton.setCallbackData("/consent_yes_" + languageCode);
 
+        // Кнопка для отказа
         InlineKeyboardButton declineButton = new InlineKeyboardButton();
-        declineButton.setText(
-                "ru".equals(languageCode) ? "Нет" : "uk".equals(languageCode) ? "Ні" : "No"
-        );
+        declineButton.setText(messageService.getLocalizedMessage("consent_no", languageCode));
         declineButton.setCallbackData("/consent_no_" + languageCode);
 
+        // Добавляем кнопки в клавиатуру
         rows.add(Arrays.asList(consentButton, declineButton));
         inlineKeyboardMarkup.setKeyboard(rows);
 
+        // Отправляем сообщение с клавиатурой
         messageService.sendMessageWithInlineKeyboard(chatId, message, inlineKeyboardMarkup);
     }
 
     protected void register(Long chatId, String languageCode, Update update) {
-        String firstNamePrompt = "ru".equals(languageCode) ? "Пожалуйста, введите ваше имя:" :
-                "uk".equals(languageCode) ? "Будь ласка, введіть ваше ім'я:" :
-                        "Please enter your first name:";
+        // Локализуем запрос для ввода имени с использованием messageService
+        String firstNamePrompt = messageService.getLocalizedMessage("register_first_name_prompt", languageCode);
+
+        // Отправляем локализованное сообщение
         messageService.sendMessage(chatId, firstNamePrompt);
 
         // Устанавливаем начальное состояние для ввода имени
@@ -181,65 +167,62 @@ public class UserService {
     }
 
     protected void processFirstName(Long chatId, String languageCode, Update update) {
-        // Проверяем, содержит ли update текстовое сообщение
         if (update.hasMessage() && update.getMessage().hasText()) {
             String firstName = update.getMessage().getText();
+
+            // Validate the length of the first name
+            if (firstName.length() < 2 || firstName.length() > 50) {
+                String errorMessage = messageService.getLocalizedMessage("error_first_name_length", languageCode);
+                messageService.sendMessage(chatId, errorMessage);
+                return;
+            }
+
             userSession.setUserInfo(chatId, new String[]{firstName, null});
 
-            String lastNamePrompt = "ru".equals(languageCode) ? "Теперь введите вашу фамилию:" :
-                    "uk".equals(languageCode) ? "Тепер введіть ваше прізвище:" :
-                            "Now, please enter your last name:";
+            // Request last name
+            String lastNamePrompt = messageService.getLocalizedMessage("register_last_name_prompt", languageCode);
             messageService.sendMessage(chatId, lastNamePrompt);
 
-            // Передаем управление в processLastName, устанавливая состояние
             userSession.setCurrentState(chatId, "/awaiting_last_name_" + languageCode);
         } else {
-            // Отправляем ошибку, если нет текстового сообщения
-            String errorMessage = "ru".equals(languageCode)
-                    ? "Ошибка: введите текстовое сообщение."
-                    : "uk".equals(languageCode)
-                    ? "Помилка: введіть текстове повідомлення."
-                    : "Error: Please enter a text message.";
-
+            String errorMessage = messageService.getLocalizedMessage("error_invalid_input", languageCode);
             messageService.sendMessage(chatId, errorMessage);
         }
     }
 
     protected void processLastName(Long chatId, String languageCode, Update update) {
-        // Проверяем, содержит ли update текстовое сообщение
         if (update.hasMessage() && update.getMessage().hasText()) {
             String lastName = update.getMessage().getText();
+
+            // Validate the length of the last name
+            if (lastName.length() < 2 || lastName.length() > 50) {
+                String errorMessage = messageService.getLocalizedMessage("error_last_name_length", languageCode);
+                messageService.sendMessage(chatId, errorMessage);
+                return;
+            }
+
             String[] userInfo = userSession.getUserInfo(chatId);
             userInfo[1] = lastName;
 
+            // Request phone number
             requestPhoneNumber(chatId, languageCode);
         } else {
-            String errorMessage = "ru".equals(languageCode)
-                    ? "Ошибка: введите текстовое сообщение."
-                    : "uk".equals(languageCode)
-                    ? "Помилка: введіть текстове повідомлення."
-                    : "Error: Please enter a text message.";
-
+            String errorMessage = messageService.getLocalizedMessage("error_invalid_input", languageCode);
             messageService.sendMessage(chatId, errorMessage);
         }
     }
 
     private void requestPhoneNumber(Long chatId, String languageCode) {
-        String message;
-        if ("ru".equals(languageCode)) {
-            message = "Пожалуйста, введите свой номер телефона, чтобы продолжить.";
-        } else if ("uk".equals(languageCode)) {
-            message = "Будь ласка, введіть свій номер телефону, щоб продовжити.";
-        } else {
-            message = "Please enter your phone number to continue.";
-        }
+        // Локализуем сообщение для запроса номера телефона
+        String message = messageService.getLocalizedMessage("request_phone_number", languageCode);
 
-        // Отправляем сообщение с просьбой ввести номер телефона вручную
+        // Отправляем локализованное сообщение
         messageService.sendMessage(chatId, message);
 
         // Обновляем состояние пользователя
         userSession.setCurrentState(chatId, "/awaiting_phone_" + languageCode);
     }
+
 
     protected Users createUser(Long chatId, String[] userInfo, String phoneNumber, String languageCode) {
         Users users = new Users();
@@ -255,11 +238,10 @@ public class UserService {
     }
 
     protected void sendSuccessMessage(Long chatId, String languageCode) {
-        String message = "ru".equals(languageCode) ?
-                "Спасибо за ваше согласие! Теперь вы можете продолжить работу с ботом и записаться на услугу." :
-                "uk".equals(languageCode) ?
-                        "Дякуємо за вашу згоду! Тепер ви можете продовжити роботу з ботом і записатися на послугу." :
-                        "Thank you for your consent! You may now continue using the bot and proceed with booking your appointment.";
+        // Use messageService to get localized success message
+        String message = messageService.getLocalizedMessage("success_message", languageCode);
+
+        // Send the localized message with an inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, message, autUserButtons.getAuthenticatedInlineKeyboard(chatId));
     }
 
@@ -270,21 +252,8 @@ public class UserService {
     protected void initialHelp(long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Сообщение помощи
-        String message = "ru".equals(languageCode)
-                ? "Добро пожаловать в меню помощи! Вы можете:\n" +
-                "1. Написать админу для решения вопросов.\n" +
-                "2. Написать мастеру для уточнения записи.\n" +
-                "3. Ознакомиться со списком доступных команд."
-                : "uk".equals(languageCode)
-                ? "Ласкаво просимо до меню допомоги! Ви можете:\n" +
-                "1. Написати адміністратору для вирішення питань.\n" +
-                "2. Написати майстру для уточнення запису.\n" +
-                "3. Ознайомитися зі списком доступних команд."
-                : "Welcome to the help menu! You can:\n" +
-                "1. Contact the admin for assistance.\n" +
-                "2. Message the master for booking clarification.\n" +
-                "3. View the list of available commands.";
+        // Получаем локализованное сообщение для помощи
+        String message = messageService.getLocalizedMessage("help_message", languageCode);
 
         // Создаем клавиатуру с кнопками
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
@@ -292,22 +261,22 @@ public class UserService {
 
         // Кнопка "Написать админу"
         InlineKeyboardButton adminButton = new InlineKeyboardButton();
-        adminButton.setText("ru".equals(languageCode) ? "Написать админу" : "uk".equals(languageCode) ? "Написати адміністратору" : "Contact Admin");
+        adminButton.setText(messageService.getLocalizedMessage("contact_admin_button", languageCode));
         adminButton.setCallbackData("/contact_admin");
 
         // Кнопка "Написать мастеру"
         InlineKeyboardButton masterButton = new InlineKeyboardButton();
-        masterButton.setText("ru".equals(languageCode) ? "Написать мастеру" : "uk".equals(languageCode) ? "Написати майстру" : "Message Master");
+        masterButton.setText(messageService.getLocalizedMessage("contact_master_button", languageCode));
         masterButton.setCallbackData("/contact_master");
 
         // Кнопка "Список команд"
         InlineKeyboardButton commandsButton = new InlineKeyboardButton();
-        commandsButton.setText("ru".equals(languageCode) ? "Список команд" : "uk".equals(languageCode) ? "Список команд" : "List of Commands");
+        commandsButton.setText(messageService.getLocalizedMessage("list_commands_button", languageCode));
         commandsButton.setCallbackData("/list_commands");
 
         // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/back");
 
         // Добавляем кнопки в строки
@@ -325,25 +294,21 @@ public class UserService {
     protected void listCommands(long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Текст для заголовка
-        String header = "ru".equals(languageCode)
-                ? "Добро пожаловать в меню помощи! Вот доступные команды:\n"
-                : "uk".equals(languageCode)
-                ? "Ласкаво просимо до меню допомоги! Ось доступні команди:\n"
-                : "Welcome to the help menu! Here are the available commands:\n";
+        // Локализуем заголовок
+        String header = messageService.getLocalizedMessage("help_menu_header", languageCode);
 
-        // Список команд
+        // Список команд с локализацией
         Map<String, String> commands = Map.of(
-                "/services", "ru".equals(languageCode) ? "Список услуг" : "uk".equals(languageCode) ? "Список послуг" : "List of services",
-                "/review", "ru".equals(languageCode) ? "Оставить отзыв" : "uk".equals(languageCode) ? "Залишити відгук" : "Leave a review",
-                "/start", "ru".equals(languageCode) ? "Запустить бота" : "uk".equals(languageCode) ? "Запустити бота" : "Start the bot",
-                "/help", "ru".equals(languageCode) ? "Помощь" : "uk".equals(languageCode) ? "Допомога" : "Help",
-                "/main_menu", "ru".equals(languageCode) ? "Главное меню" : "uk".equals(languageCode) ? "Головне меню" : "Main menu",
-                "/back", "ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back",
-                "/menu", "ru".equals(languageCode) ? "Меню" : "uk".equals(languageCode) ? "Меню" : "Menu",
-                "/cancel", "ru".equals(languageCode) ? "Отмена операции" : "uk".equals(languageCode) ? "Скасування операції" : "Cancel operation",
-                "/settings", "ru".equals(languageCode) ? "Настройки" : "uk".equals(languageCode) ? "Налаштування" : "Settings",
-                "/book", "ru".equals(languageCode) ? "Записаться на услугу" : "uk".equals(languageCode) ? "Записатися на послугу" : "Book a service"
+                "/services", messageService.getLocalizedMessage("command_services", languageCode),
+                "/review", messageService.getLocalizedMessage("command_review", languageCode),
+                "/start", messageService.getLocalizedMessage("command_start", languageCode),
+                "/help", messageService.getLocalizedMessage("command_help", languageCode),
+                "/main_menu", messageService.getLocalizedMessage("command_main_menu", languageCode),
+                "/back", messageService.getLocalizedMessage("command_back", languageCode),
+                "/menu", messageService.getLocalizedMessage("command_menu", languageCode),
+                "/cancel", messageService.getLocalizedMessage("command_cancel", languageCode),
+                "/settings", messageService.getLocalizedMessage("command_settings", languageCode),
+                "/book", messageService.getLocalizedMessage("command_book", languageCode)
         );
 
         // Формирование текста сообщения
@@ -353,7 +318,7 @@ public class UserService {
         // Создаем кнопку "Назад"
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("button_back", languageCode));
         backButton.setCallbackData("/back");
 
         keyboard.setKeyboard(List.of(List.of(backButton)));
@@ -365,33 +330,34 @@ public class UserService {
     public void contactAdmin(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите действие:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дію:"
-                : "Choose an action:";
+        // Локализуем сообщение выбора действия
+        String message = messageService.getLocalizedMessage("choose_action", languageCode);
 
+        // Создаем клавиатуру
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // Кнопка "Задать новый вопрос"
         InlineKeyboardButton newQuestionButton = new InlineKeyboardButton();
-        newQuestionButton.setText("ru".equals(languageCode) ? "Задать новый вопрос" : "uk".equals(languageCode) ? "Задати нове запитання" : "Ask a new question");
+        newQuestionButton.setText(messageService.getLocalizedMessage("ask_new_question", languageCode));
         newQuestionButton.setCallbackData("/ask_new_question");
 
         // Кнопка "Посмотреть старые запросы"
         InlineKeyboardButton viewRequestsButton = new InlineKeyboardButton();
-        viewRequestsButton.setText("ru".equals(languageCode) ? "Посмотреть запросы" : "uk".equals(languageCode) ? "Переглянути запити" : "View requests");
+        viewRequestsButton.setText(messageService.getLocalizedMessage("view_requests", languageCode));
         viewRequestsButton.setCallbackData("/view_requests");
 
+        // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("button_back", languageCode));
         backButton.setCallbackData("/help");
 
+        // Добавляем кнопки в строки
         rows.add(List.of(newQuestionButton));
         rows.add(List.of(viewRequestsButton));
         rows.add(List.of(backButton));
 
+        // Устанавливаем клавиатуру и отправляем сообщение
         keyboard.setKeyboard(rows);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
@@ -399,15 +365,13 @@ public class UserService {
     protected void askNewQuestion(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Напишите ваш вопрос:"
-                : "uk".equals(languageCode)
-                ? "Напишіть ваше запитання:"
-                : "Write your question:";
+        // Локализуем сообщение для запроса нового вопроса
+        String message = messageService.getLocalizedMessage("ask_new_question_prompt", languageCode);
 
         // Устанавливаем текущую команду
         userSession.setCurrentState(chatId, "/new_question");
 
+        // Отправляем сообщение с просьбой написать вопрос
         messageService.sendMessage(chatId, message);
     }
 
@@ -418,12 +382,8 @@ public class UserService {
         // Сохраняем запрос в базе данных
         helpService.createHelpRequest(users.getId(), questionText);
 
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Ваш вопрос успешно отправлен админу."
-                : "uk".equals(languageCode)
-                ? "Ваше запитання успішно надіслано адміністратору."
-                : "Your question has been successfully sent to the admin.";
-
+        // Локализуем сообщение о подтверждении
+        String confirmationMessage = messageService.getLocalizedMessage("question_sent_confirmation", languageCode);
         messageService.sendMessage(chatId, confirmationMessage);
 
         // Возвращаем в меню "Написать админу"
@@ -436,32 +396,30 @@ public class UserService {
     public void viewRequests(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите категорию запросов:"
-                : "uk".equals(languageCode)
-                ? "Оберіть категорію запитів:"
-                : "Choose a request category:";
+        // Локализуем сообщение для выбора категории запросов
+        String message = messageService.getLocalizedMessage("choose_request_category", languageCode);
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // Кнопка "Открытые"
         InlineKeyboardButton openRequestsButton = new InlineKeyboardButton();
-        openRequestsButton.setText("ru".equals(languageCode) ? "Открытые" : "uk".equals(languageCode) ? "Відкриті" : "Open");
+        openRequestsButton.setText(messageService.getLocalizedMessage("open_requests", languageCode));
         openRequestsButton.setCallbackData("/view_open_requests");
 
         // Кнопка "В процессе"
         InlineKeyboardButton inProgressRequestsButton = new InlineKeyboardButton();
-        inProgressRequestsButton.setText("ru".equals(languageCode) ? "В процессе" : "uk".equals(languageCode) ? "У процесі" : "In Progress");
+        inProgressRequestsButton.setText(messageService.getLocalizedMessage("in_progress_requests", languageCode));
         inProgressRequestsButton.setCallbackData("/view_in_progress_requests");
 
         // Кнопка "Завершенные"
         InlineKeyboardButton closedRequestsButton = new InlineKeyboardButton();
-        closedRequestsButton.setText("ru".equals(languageCode) ? "Завершенные" : "uk".equals(languageCode) ? "Завершені" : "Closed");
+        closedRequestsButton.setText(messageService.getLocalizedMessage("closed_requests", languageCode));
         closedRequestsButton.setCallbackData("/view_closed_requests");
 
+        // Кнопка "Назад"
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back", languageCode));
         backButton.setCallbackData("/contact_admin");
 
         rows.add(List.of(openRequestsButton));
@@ -482,20 +440,14 @@ public class UserService {
         List<Help> openRequests = helpRepository.findByUser_IdAndStatus(userId, Help.HelpStatus.WAIT);
 
         if (openRequests.isEmpty()) {
-            String noRequestsMessage = "ru".equals(languageCode)
-                    ? "У вас нет открытых запросов."
-                    : "uk".equals(languageCode)
-                    ? "У вас немає відкритих запитів."
-                    : "You have no open requests.";
+            // Локализуем сообщение о том, что нет открытых запросов
+            String noRequestsMessage = messageService.getLocalizedMessage("no_open_requests", languageCode);
             messageService.sendMessage(chatId, noRequestsMessage);
             return;
         }
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату открытого запроса:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату відкритого запиту:"
-                : "Select the date of the open request:";
+        // Локализуем сообщение для выбора даты открытого запроса
+        String message = messageService.getLocalizedMessage("select_open_request_date", languageCode);
 
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -510,7 +462,7 @@ public class UserService {
 
         // Добавляем кнопки назад
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back", languageCode));
         backButton.setCallbackData("/view_requests");
         rows.add(List.of(backButton));
 
@@ -519,121 +471,134 @@ public class UserService {
     }
 
     public void handleViewRequest(Long chatId, Long helpId) {
+        // Retrieve the Help object from the repository
         Help help = helpRepository.findById(helpId)
                 .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
 
+        // Retrieve the language code for the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Ваш запрос:\n" + help.getHelpQuestion()
-                : "uk".equals(languageCode)
-                ? "Ваш запит:\n" + help.getHelpQuestion()
-                : "Your request:\n" + help.getHelpQuestion();
+        // Localize the message using the messageService
+        String message = messageService.getLocalizedMessage("view_request_message", languageCode)
+                + "\n" + help.getHelpQuestion();
 
+        // Create the keyboard with the "Back" button
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Localize the "Back" button text
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back", languageCode));
         backButton.setCallbackData("/view_requests");
         rows.add(List.of(backButton));
+
         keyboard.setKeyboard(rows);
 
+        // Send the message with the inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
     public void handleInProgressRequests(Long chatId) {
+        // Retrieve the language code for the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         Long userId = userRepository.findByChatId(chatId).getId();
 
+        // Fetch in-progress requests
         List<Help> inProgressRequests = helpRepository.findByUser_IdAndStatus(userId, Help.HelpStatus.OPEN);
 
+        // If no in-progress requests, send an appropriate message
         if (inProgressRequests.isEmpty()) {
-            String noRequestsMessage = "ru".equals(languageCode)
-                    ? "У вас нет запросов в процессе."
-                    : "uk".equals(languageCode)
-                    ? "У вас немає запитів у процесі."
-                    : "You have no requests in progress.";
+            String noRequestsMessage = messageService.getLocalizedMessage("no_in_progress_requests", languageCode);
             messageService.sendMessage(chatId, noRequestsMessage);
             return;
         }
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату запроса в процессе:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату запиту у процесі:"
-                : "Select the date of the request in progress:";
+        // Localized message for selecting a date
+        String message = messageService.getLocalizedMessage("select_in_progress_request_date", languageCode);
 
+        // Create the inline keyboard with buttons for each in-progress request
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         for (Help help : inProgressRequests) {
             InlineKeyboardButton button = new InlineKeyboardButton();
-            button.setText(help.getCreatedAt().toLocalDate().toString());
+            button.setText(help.getCreatedAt().toLocalDate().toString());  // Only date of the request
             button.setCallbackData("/progress_request_" + help.getId());
             rows.add(List.of(button));
         }
 
+        // Add the "Back" button
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back", languageCode));
         backButton.setCallbackData("/view_requests");
         rows.add(List.of(backButton));
 
+        // Set the keyboard and send the message
         keyboard.setKeyboard(rows);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
     public void handleViewInProgressRequest(Long chatId, Long helpId) {
+        // Retrieve the help request from the repository
         Help help = helpRepository.findById(helpId)
                 .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
 
+        // Retrieve the language code for the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Ваш запрос:\n" + help.getHelpQuestion() + "\nОтвет администратора:\n" + help.getAdminResponse()
-                : "uk".equals(languageCode)
-                ? "Ваш запит:\n" + help.getHelpQuestion() + "\nВідповідь адміністратора:\n" + help.getAdminResponse()
-                : "Your request:\n" + help.getHelpQuestion() + "\nAdmin's response:\n" + help.getAdminResponse();
+        // Create the message with localized content
+        String message = messageService.getLocalizedMessage("view_in_progress_request_message", languageCode);
+        message = message.replace("{question}", help.getHelpQuestion())
+                .replace("{response}", help.getAdminResponse());
 
+        // Create the inline keyboard markup
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Create the "Yes" button (to close the request)
         InlineKeyboardButton yesButton = new InlineKeyboardButton();
-        yesButton.setText("ru".equals(languageCode) ? "Да" : "uk".equals(languageCode) ? "Так" : "Yes");
+        yesButton.setText(messageService.getLocalizedMessage("yes_button", languageCode));
         yesButton.setCallbackData("/close_request_" + helpId);
 
+        // Create the "No" button (to ask a new question)
         InlineKeyboardButton noButton = new InlineKeyboardButton();
-        noButton.setText("ru".equals(languageCode) ? "Нет" : "uk".equals(languageCode) ? "Ні" : "No");
+        noButton.setText(messageService.getLocalizedMessage("no_button", languageCode));
         noButton.setCallbackData("/new_question_" + helpId);
 
+        // Create the "Back" button (to view requests)
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/view_requests");
 
+        // Add buttons to rows
         rows.add(List.of(yesButton, noButton));
         rows.add(List.of(backButton));
         keyboard.setKeyboard(rows);
 
+        // Send the message with the inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
     public void handleCloseRequest(Long chatId, Long helpId) {
+        // Retrieve the language code for the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
+
+        // Retrieve the help request
         Help help = helpRepository.findById(helpId)
                 .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
 
+        // Set the status of the help request to CLOSED and save the date
         help.setStatus(Help.HelpStatus.CLOSED);
         help.setClosedAt(LocalDateTime.now());
         helpRepository.save(help);
 
-        String message = "ru".equals(languageCode)
-                ? "Ваш запрос был закрыт."
-                : "uk".equals(languageCode)
-                ? "Ваш запит було закрито."
-                : "Your request has been closed.";
+        // Get localized message for request closure
+        String message = messageService.getLocalizedMessage("request_closed", languageCode);
 
+        // Send the closure confirmation message
         messageService.sendMessage(chatId, message);
 
+        // Show the list of requests again
         viewRequests(chatId);
     }
 
@@ -648,78 +613,86 @@ public class UserService {
     }
 
     public void handleClosedRequests(Long chatId) {
+        // Retrieve the language code for the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         Long userId = userRepository.findByChatId(chatId).getId();
 
+        // Fetch the closed help requests for the user
         List<Help> closedRequests = helpRepository.findByUser_IdAndStatus(userId, Help.HelpStatus.CLOSED);
 
         if (closedRequests.isEmpty()) {
-            String noRequestsMessage = "ru".equals(languageCode)
-                    ? "У вас нет завершенных запросов."
-                    : "uk".equals(languageCode)
-                    ? "У вас немає завершених запитів."
-                    : "You have no closed requests.";
+            // Get the localized message for when there are no closed requests
+            String noRequestsMessage = messageService.getLocalizedMessage("no_closed_requests", languageCode);
             messageService.sendMessage(chatId, noRequestsMessage);
             return;
         }
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите дату завершенного запроса:"
-                : "uk".equals(languageCode)
-                ? "Оберіть дату завершеного запиту:"
-                : "Select the date of the closed request:";
+        // Get the localized message for selecting a closed request
+        String message = messageService.getLocalizedMessage("select_closed_request_date", languageCode);
 
+        // Prepare the inline keyboard
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Create a button for each closed request
         for (Help help : closedRequests) {
             InlineKeyboardButton button = new InlineKeyboardButton();
-            button.setText(help.getCreatedAt().toLocalDate().toString());
+            button.setText(help.getCreatedAt().toLocalDate().toString()); // Show only the date
             button.setCallbackData("/closed_request_" + help.getId());
             rows.add(List.of(button));
         }
 
+        // Add the back button
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/view_requests");
         rows.add(List.of(backButton));
 
         keyboard.setKeyboard(rows);
+
+        // Send the message with the inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
     public void handleViewClosedRequest(Long chatId, Long helpId) {
+        // Retrieve the help request from the database
         Help help = helpRepository.findById(helpId)
                 .orElseThrow(() -> new IllegalArgumentException("Help request not found"));
 
+        // Get the language code for the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Ваш запрос:\n" + help.getHelpQuestion() + "\nОтвет администратора:\n" + help.getAdminResponse()
-                : "uk".equals(languageCode)
-                ? "Ваш запит:\n" + help.getHelpQuestion() + "\nВідповідь адміністратора:\n" + help.getAdminResponse()
-                : "Your request:\n" + help.getHelpQuestion() + "\nAdmin's response:\n" + help.getAdminResponse();
+        // Prepare the message using localized text
+        String message = messageService.getLocalizedMessage("view_closed_request_message", languageCode) +
+                "\n" + help.getHelpQuestion() +
+                "\n" + messageService.getLocalizedMessage("admin_response", languageCode) + "\n" + help.getAdminResponse();
 
+        // Create the inline keyboard
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // Button to create a new request
         InlineKeyboardButton newRequestButton = new InlineKeyboardButton();
-        newRequestButton.setText("ru".equals(languageCode) ? "Создать новый запрос" : "uk".equals(languageCode) ? "Створити новий запит" : "Create new request");
+        newRequestButton.setText(messageService.getLocalizedMessage("create_new_request", languageCode));
         newRequestButton.setCallbackData("/ask_new_question");
 
+        // Button to delete the request
         InlineKeyboardButton deleteRequestButton = new InlineKeyboardButton();
-        deleteRequestButton.setText("ru".equals(languageCode) ? "Удалить запрос" : "uk".equals(languageCode) ? "Видалити запит" : "Delete request");
+        deleteRequestButton.setText(messageService.getLocalizedMessage("delete_request", languageCode));
         deleteRequestButton.setCallbackData("/delete_request_" + helpId);
 
+        // Back button to view requests
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/view_requests");
 
+        // Add buttons to the keyboard
         rows.add(List.of(newRequestButton));
         rows.add(List.of(deleteRequestButton));
         rows.add(List.of(backButton));
         keyboard.setKeyboard(rows);
 
+        // Send the message with the inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -732,11 +705,7 @@ public class UserService {
 
         if (userId == null) {
             // Отправляем сообщение, если пользователь не найден
-            String userNotFoundMessage = "ru".equals(languageCode)
-                    ? "Пользователь не найден."
-                    : "uk".equals(languageCode)
-                    ? "Користувач не знайдений."
-                    : "User not found.";
+            String userNotFoundMessage = messageService.getLocalizedMessage("user_not_found", languageCode);
             messageService.sendMessage(chatId, userNotFoundMessage);
             return;
         }
@@ -746,11 +715,7 @@ public class UserService {
 
         if (helpOptional.isEmpty() || !helpOptional.get().getUser().getId().equals(userId)) {
             // Сообщаем, что запрос не найден
-            String helpNotFoundMessage = "ru".equals(languageCode)
-                    ? "Запрос не найден или не принадлежит вам."
-                    : "uk".equals(languageCode)
-                    ? "Запит не знайдений або не належить вам."
-                    : "Request not found or does not belong to you.";
+            String helpNotFoundMessage = messageService.getLocalizedMessage("help_not_found", languageCode);
             messageService.sendMessage(chatId, helpNotFoundMessage);
             return;
         }
@@ -759,12 +724,10 @@ public class UserService {
         helpRepository.deleteById(helpId);
 
         // Подтверждаем удаление
-        String deleteSuccessMessage = "ru".equals(languageCode)
-                ? "Запрос успешно удален."
-                : "uk".equals(languageCode)
-                ? "Запит успішно видалений."
-                : "Request successfully deleted.";
+        String deleteSuccessMessage = messageService.getLocalizedMessage("delete_success", languageCode);
         messageService.sendMessage(chatId, deleteSuccessMessage);
+
+        // Возвращаем в меню запросов
         viewRequests(chatId);
     }
 
@@ -775,11 +738,8 @@ public class UserService {
         List<Master> masters = masterRepository.findAllByStatus(Master.Status.ACTIVE);
 
         if (masters.isEmpty()) {
-            String noMastersMessage = "ru".equals(languageCode)
-                    ? "В системе нет мастеров."
-                    : "uk".equals(languageCode)
-                    ? "У системі немає майстрів."
-                    : "There are no masters in the system.";
+            // Локализованное сообщение, если мастера не найдены
+            String noMastersMessage = messageService.getLocalizedMessage("no_masters_in_system", languageCode);
             messageService.sendMessage(chatId, noMastersMessage);
             initialHelp(chatId);
             return;
@@ -798,20 +758,14 @@ public class UserService {
 
         // Добавляем кнопку "Отмена"
         InlineKeyboardButton cancelButton = new InlineKeyboardButton();
-        cancelButton.setText(
-                "ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back"
-        );
+        cancelButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         cancelButton.setCallbackData("/help");
         rows.add(List.of(cancelButton));
 
         keyboard.setKeyboard(rows);
 
-        String message = "ru".equals(languageCode)
-                ? "Выберите мастера:"
-                : "uk".equals(languageCode)
-                ? "Виберіть майстра:"
-                : "Select a master:";
-
+        // Локализованное сообщение для выбора мастера
+        String message = messageService.getLocalizedMessage("select_master", languageCode);
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -822,11 +776,8 @@ public class UserService {
         Optional<Master> masterOptional = masterRepository.findById(masterId);
 
         if (masterOptional.isEmpty()) {
-            String noMasterFoundMessage = "ru".equals(languageCode)
-                    ? "Мастер не найден."
-                    : "uk".equals(languageCode)
-                    ? "Майстра не знайдено."
-                    : "Master not found.";
+            // Локализуем сообщение, если мастер не найден
+            String noMasterFoundMessage = messageService.getLocalizedMessage("master_not_found", languageCode);
             messageService.sendMessage(chatId, noMasterFoundMessage);
             return;
         }
@@ -834,20 +785,8 @@ public class UserService {
         Master master = masterOptional.get();
 
         // Формируем сообщение с информацией о мастере
-        String message = "ru".equals(languageCode)
-                ? "Информация о мастере:\n" +
-                "Имя: " + master.getName() + "\n" +
-                "Телефон: " + master.getPhoneNumber() + "\n" +
-                "Описание: " + master.getDescription()
-                : "uk".equals(languageCode)
-                ? "Інформація про майстра:\n" +
-                "Ім'я: " + master.getName() + "\n" +
-                "Телефон: " + master.getPhoneNumber() + "\n" +
-                "Опис: " + master.getDescription()
-                : "Information about the master:\n" +
-                "Name: " + master.getName() + "\n" +
-                "Phone: " + master.getPhoneNumber() + "\n" +
-                "Description: " + master.getDescription();
+        String message = messageService.getLocalizedMessage("master_info", languageCode);
+        message = String.format(message, master.getName(), master.getPhoneNumber(), master.getDescription());
 
         // Создаем inline-клавиатуру
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
@@ -856,21 +795,20 @@ public class UserService {
         // Кнопка для социальных сетей мастера (если есть ссылка)
         if (master.getSocialLink() != null && !master.getSocialLink().isEmpty()) {
             InlineKeyboardButton socialButton = new InlineKeyboardButton();
-            socialButton.setText("ru".equals(languageCode) ? "Социальная сеть" :
-                    "uk".equals(languageCode) ? "Соціальна мережа" : "Social Link");
+            socialButton.setText(messageService.getLocalizedMessage("social_link", languageCode));
             socialButton.setUrl(master.getSocialLink());
             rows.add(List.of(socialButton));
         }
+
         // Кнопка для возврата назад
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" :
-                "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/contact_master");
 
         rows.add(List.of(backButton));
         keyboard.setKeyboard(rows);
 
-        // Отправляем клавиатуру
+        // Отправляем сообщение с клавиатурой
         messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
     }
 
@@ -878,11 +816,9 @@ public class UserService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         Users user = userRepository.findByChatId(chatId);
 
-        String message = "ru".equals(languageCode)
-                ? "Привет, " + user.getFirstName() + " " + user.getLastName() + "! Здесь вы можете изменить свое имя и фамилию."
-                : "uk".equals(languageCode)
-                ? "Привіт, " + user.getFirstName() + " " + user.getLastName() + "! Тут ви можете змінити своє ім'я та прізвище."
-                : "Hello, " + user.getFirstName() + " " + user.getLastName() + "! Here you can change your name and last name.";
+        // Локализуем приветственное сообщение
+        String message = messageService.getLocalizedMessage("change_name_greeting", languageCode);
+        message = String.format(message, user.getFirstName(), user.getLastName());
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
@@ -890,9 +826,7 @@ public class UserService {
         // Кнопка для изменения имени
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         InlineKeyboardButton changeFirstNameButton = new InlineKeyboardButton();
-        changeFirstNameButton.setText("ru".equals(languageCode) ? "Сменить имя" :
-                "uk".equals(languageCode) ? "Змінити ім'я" :
-                        "Change First Name");
+        changeFirstNameButton.setText(messageService.getLocalizedMessage("change_first_name", languageCode));
         changeFirstNameButton.setCallbackData("/change_first_name");
         row1.add(changeFirstNameButton);
         rowsInline.add(row1);
@@ -900,9 +834,7 @@ public class UserService {
         // Кнопка для изменения фамилии
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton changeLastNameButton = new InlineKeyboardButton();
-        changeLastNameButton.setText("ru".equals(languageCode) ? "Сменить фамилию" :
-                "uk".equals(languageCode) ? "Змінити прізвище" :
-                        "Change Last Name");
+        changeLastNameButton.setText(messageService.getLocalizedMessage("change_last_name", languageCode));
         changeLastNameButton.setCallbackData("/change_last_name");
         row2.add(changeLastNameButton);
         rowsInline.add(row2);
@@ -910,9 +842,7 @@ public class UserService {
         // Кнопка "Назад" для возврата в настройки
         List<InlineKeyboardButton> row3 = new ArrayList<>();
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" :
-                "uk".equals(languageCode) ? "Назад" :
-                        "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/settings");
         row3.add(backButton);
         rowsInline.add(row3);
@@ -927,12 +857,8 @@ public class UserService {
     protected void changeFirstName(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Отправляем запрос на ввод нового имени
-        String message = "ru".equals(languageCode)
-                ? "Введите новое имя:"
-                : "uk".equals(languageCode)
-                ? "Введіть нове ім'я:"
-                : "Please enter the new first name:";
+        // Локализуем запрос для ввода нового имени
+        String message = messageService.getLocalizedMessage("change_first_name_prompt", languageCode);
 
         messageService.sendMessage(chatId, message);
 
@@ -945,21 +871,14 @@ public class UserService {
 
         // Проверка длины имени
         if (newFirstName == null || newFirstName.trim().length() < 2) {
-            String errorMessage = "ru".equals(languageCode)
-                    ? "Имя должно содержать не менее 2 символов. Попробуйте еще раз:"
-                    : "uk".equals(languageCode)
-                    ? "Ім'я має містити не менше 2 символів. Спробуйте ще раз:"
-                    : "The first name must contain at least 2 characters. Please try again:";
+            // Локализуем ошибку
+            String errorMessage = messageService.getLocalizedMessage("first_name_length_error", languageCode);
             messageService.sendMessage(chatId, errorMessage);
             return;
         }
 
-        // Сообщение с подтверждением
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы хотите сменить имя на: " + newFirstName + "?"
-                : "uk".equals(languageCode)
-                ? "Ви хочете змінити ім'я на: " + newFirstName + "?"
-                : "Do you want to change your name to: " + newFirstName + "?";
+        // Локализуем сообщение с подтверждением
+        String confirmationMessage = messageService.getLocalizedMessage("confirm_first_name_change", languageCode, newFirstName);
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
@@ -967,9 +886,7 @@ public class UserService {
         // Кнопка "Да"
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         InlineKeyboardButton yesButton = new InlineKeyboardButton();
-        yesButton.setText("ru".equals(languageCode) ? "Да" :
-                "uk".equals(languageCode) ? "Так" :
-                        "Yes");
+        yesButton.setText(messageService.getLocalizedMessage("yes", languageCode));
         yesButton.setCallbackData("/confirm_change_first_name_" + newFirstName);
         row1.add(yesButton);
         rowsInline.add(row1);
@@ -977,9 +894,7 @@ public class UserService {
         // Кнопка "Нет"
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton noButton = new InlineKeyboardButton();
-        noButton.setText("ru".equals(languageCode) ? "Нет" :
-                "uk".equals(languageCode) ? "Ні" :
-                        "No");
+        noButton.setText(messageService.getLocalizedMessage("no", languageCode));
         noButton.setCallbackData("/cancel_change_first_name");
         row2.add(noButton);
         rowsInline.add(row2);
@@ -987,7 +902,7 @@ public class UserService {
         inlineKeyboardMarkup.setKeyboard(rowsInline);
         userSession.setCurrentState(chatId, "/settings");
 
-        // Отправляем сообщение с подтверждением
+        // Отправляем сообщение с клавиатурой
         messageService.sendMessageWithInlineKeyboard(chatId, confirmationMessage, inlineKeyboardMarkup);
     }
 
@@ -995,13 +910,11 @@ public class UserService {
         // Обновляем имя в базе данных
         userRepository.updateFirstName(chatId, newFirstName);
 
-        // Сообщение об успешном изменении
+        // Получаем код языка пользователя
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-        String successMessage = "ru".equals(languageCode)
-                ? "Имя успешно изменено на: " + newFirstName
-                : "uk".equals(languageCode)
-                ? "Ім'я успішно змінено на: " + newFirstName
-                : "First name successfully changed to: " + newFirstName;
+
+        // Локализуем сообщение об успешном изменении имени
+        String successMessage = messageService.getLocalizedMessage("first_name_change_success", languageCode, newFirstName);
 
         messageService.sendMessage(chatId, successMessage);
 
@@ -1010,14 +923,11 @@ public class UserService {
     }
 
     protected void cancelChangeFirstName(Long chatId) {
+        // Получаем код языка пользователя
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Сообщение об отмене
-        String cancelMessage = "ru".equals(languageCode)
-                ? "Изменение имени отменено."
-                : "uk".equals(languageCode)
-                ? "Зміна імені скасована."
-                : "First name change canceled.";
+        // Локализуем сообщение об отмене
+        String cancelMessage = messageService.getLocalizedMessage("first_name_change_cancelled", languageCode);
 
         messageService.sendMessage(chatId, cancelMessage);
 
@@ -1028,12 +938,8 @@ public class UserService {
     protected void changeLastName(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Request for the new last name
-        String message = "ru".equals(languageCode)
-                ? "Введите новую фамилию:"
-                : "uk".equals(languageCode)
-                ? "Введіть нове прізвище:"
-                : "Please enter the new last name:";
+        // Localize the message for the new last name request
+        String message = messageService.getLocalizedMessage("enter_new_last_name", languageCode);
 
         messageService.sendMessage(chatId, message);
 
@@ -1044,50 +950,39 @@ public class UserService {
     public void handleNewLastName(Long chatId, String newLastName) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Проверка длины фамилии
+        // Validation for last name length
         if (newLastName == null || newLastName.trim().length() < 2) {
-            String errorMessage = "ru".equals(languageCode)
-                    ? "Фамилия должна содержать не менее 2 символов. Попробуйте еще раз:"
-                    : "uk".equals(languageCode)
-                    ? "Прізвище має містити не менше 2 символів. Спробуйте ще раз:"
-                    : "The last name must contain at least 2 characters. Please try again:";
+            // Localize error message
+            String errorMessage = messageService.getLocalizedMessage("last_name_error", languageCode);
             messageService.sendMessage(chatId, errorMessage);
             return;
         }
 
-        // Сообщение с подтверждением
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы хотите сменить фамилию на: " + newLastName + "?"
-                : "uk".equals(languageCode)
-                ? "Ви хочете змінити прізвище на: " + newLastName + "?"
-                : "Do you want to change your last name to: " + newLastName + "?";
+        // Localize confirmation message
+        String confirmationMessage = messageService.getLocalizedMessage("confirm_change_last_name", languageCode) + " " + newLastName + "?";
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
 
-        // Кнопка "Да"
+        // Button "Yes"
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         InlineKeyboardButton yesButton = new InlineKeyboardButton();
-        yesButton.setText("ru".equals(languageCode) ? "Да" :
-                "uk".equals(languageCode) ? "Так" :
-                        "Yes");
+        yesButton.setText(messageService.getLocalizedMessage("yes", languageCode));
         yesButton.setCallbackData("/confirm_change_last_name_" + newLastName);
         row1.add(yesButton);
         rowsInline.add(row1);
 
-        // Кнопка "Нет"
+        // Button "No"
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton noButton = new InlineKeyboardButton();
-        noButton.setText("ru".equals(languageCode) ? "Нет" :
-                "uk".equals(languageCode) ? "Ні" :
-                        "No");
+        noButton.setText(messageService.getLocalizedMessage("no", languageCode));
         noButton.setCallbackData("/cancel_change_last_name");
         row2.add(noButton);
         rowsInline.add(row2);
 
         inlineKeyboardMarkup.setKeyboard(rowsInline);
 
-        // Устанавливаем состояние и отправляем сообщение
+        // Set state and send message with the keyboard
         userSession.setCurrentState(chatId, "/settings");
         messageService.sendMessageWithInlineKeyboard(chatId, confirmationMessage, inlineKeyboardMarkup);
     }
@@ -1096,13 +991,9 @@ public class UserService {
         // Update the last name in the database
         userRepository.updateLastName(chatId, newLastName);
 
-        // Success message
+        // Localize success message
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-        String successMessage = "ru".equals(languageCode)
-                ? "Фамилия успешно изменена на: " + newLastName
-                : "uk".equals(languageCode)
-                ? "Прізвище успішно змінено на: " + newLastName
-                : "Last name successfully changed to: " + newLastName;
+        String successMessage = messageService.getLocalizedMessage("success_change_last_name", languageCode) + " " + newLastName;
 
         messageService.sendMessage(chatId, successMessage);
 
@@ -1113,12 +1004,8 @@ public class UserService {
     protected void cancelChangeLastName(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Cancellation message
-        String cancelMessage = "ru".equals(languageCode)
-                ? "Изменение фамилии отменено."
-                : "uk".equals(languageCode)
-                ? "Зміна прізвища скасована."
-                : "Last name change canceled.";
+        // Localize cancellation message
+        String cancelMessage = messageService.getLocalizedMessage("cancel_change_last_name", languageCode);
 
         messageService.sendMessage(chatId, cancelMessage);
 
@@ -1130,202 +1017,179 @@ public class UserService {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         userSession.setCurrentState(chatId, "/choose_lang");
 
-        // Создаем клавиатуру с кнопками для выбора языка
+        // Create the keyboard with buttons for language selection
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        // Кнопка для выбора русского языка
+        // Button for selecting Russian language
         InlineKeyboardButton ruButton = new InlineKeyboardButton();
-        ruButton.setText("Русский");
+        ruButton.setText(messageService.getLocalizedMessage("language_russian", languageCode));
         ruButton.setCallbackData("/lang_ru");
 
-        // Кнопка для выбора английского языка
+        // Button for selecting English language
         InlineKeyboardButton enButton = new InlineKeyboardButton();
-        enButton.setText("English");
+        enButton.setText(messageService.getLocalizedMessage("language_english", languageCode));
         enButton.setCallbackData("/lang_en");
 
-        // Кнопка для выбора украинского языка
+        // Button for selecting Ukrainian language
         InlineKeyboardButton ukButton = new InlineKeyboardButton();
-        ukButton.setText("Українська");
+        ukButton.setText(messageService.getLocalizedMessage("language_ukrainian", languageCode));
         ukButton.setCallbackData("/lang_uk");
 
-        // Добавляем кнопки в строку
+        // Add buttons to the row
         rows.add(Arrays.asList(ruButton, enButton, ukButton));
 
-        // Назад
+        // Back button
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("ru".equals(languageCode) ? "Назад" : "uk".equals(languageCode) ? "Назад" : "Back");
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
         backButton.setCallbackData("/settings");
         rows.add(Collections.singletonList(backButton));
 
         inlineKeyboardMarkup.setKeyboard(rows);
 
-        // Сообщение о выборе языка
-        String message = "ru".equals(languageCode)
-                ? "Пожалуйста, выберите язык:"
-                : "uk".equals(languageCode)
-                ? "Будь ласка, оберіть мову:"
-                : "Please select your language:";
+        // Localized message for selecting a language
+        String message = messageService.getLocalizedMessage("select_language_message", languageCode);
 
         messageService.sendMessageWithInlineKeyboard(chatId, message, inlineKeyboardMarkup);
     }
 
     protected void changeLanguage(Long chatId, String newLanguageCode) {
-        // Проверка валидности кода языка
+        // Validation of language code
         List<String> validLanguageCodes = Arrays.asList("ru", "en", "uk");
         if (!validLanguageCodes.contains(newLanguageCode)) {
-            messageService.sendMessage(chatId, "Invalid language code.");
+            messageService.sendMessage(chatId, messageService.getLocalizedMessage("invalid_language_code", newLanguageCode));
             return;
         }
 
-        // Обновляем язык в базе данных
+        // Update the language in the database
         userRepository.updateLanguageCodeByChatId(chatId, newLanguageCode);
 
-        // Отправляем сообщение о том, что язык успешно изменен
-        String successMessage = "ru".equals(newLanguageCode)
-                ? "Язык успешно изменен на Русский."
-                : "uk".equals(newLanguageCode)
-                ? "Мову успішно змінено на Українську."
-                : "Language successfully changed to English.";
-
+        // Send message about successful language change
+        String successMessage = messageService.getLocalizedMessage("language_change_success", newLanguageCode);
         messageService.sendMessage(chatId, successMessage);
 
-        // Возвращаем пользователя в главное меню настроек
+        // Return the user to the main settings menu
         initialChangeLanguage(chatId);
     }
 
     protected void initialChangePhoneNumber(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Сообщение для запроса нового номера телефона
-        String message = "ru".equals(languageCode)
-                ? "Введите новый номер телефона в формате +[код страны][номер]:"
-                : "uk".equals(languageCode)
-                ? "Введіть новий номер телефону у форматі +[код країни][номер]:"
-                : "Please enter the new phone number in the format +[country code][number]:";
+        // Get the localized message for requesting a new phone number
+        String message = messageService.getLocalizedMessage("phone_number_change_prompt", languageCode);
 
-        // Создаем клавиатуру с кнопкой "Назад"
+        // Create the inline keyboard with a "Back" button
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        // "Back" button to return to the settings menu
         InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText(
-                "ru".equals(languageCode) ? "Назад" :
-                        "uk".equals(languageCode) ? "Назад" :
-                                "Back"
-        );
-        backButton.setCallbackData("/settings"); // Команда для возврата в настройки
+        backButton.setText(messageService.getLocalizedMessage("back_button", languageCode));
+        backButton.setCallbackData("/settings"); // Command to return to settings
         rows.add(List.of(backButton));
 
         inlineKeyboardMarkup.setKeyboard(rows);
 
-        // Отправляем сообщение с клавиатурой
+        // Send the message with the inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, message, inlineKeyboardMarkup);
 
-        // Устанавливаем состояние ожидания ввода нового номера телефона
+        // Set the current state to wait for the new phone number
         userSession.setCurrentState(chatId, "/waiting_for_phone_number");
     }
 
     public void handleNewPhoneNumber(Long chatId, String newPhoneNumber) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Проверка формата номера телефона: должно начинаться с "+" и содержать от 10 до 15 цифр
+        // Check phone number format: should start with "+" and contain 10 to 15 digits
         if (!newPhoneNumber.matches("^\\+\\d{10,15}$")) {
-            String errorMessage = "ru".equals(languageCode)
-                    ? "Неверный формат номера. Убедитесь, что номер начинается с '+' и содержит от 10 до 15 цифр."
-                    : "uk".equals(languageCode)
-                    ? "Невірний формат номера. Переконайтеся, що номер починається з '+' і містить від 10 до 15 цифр."
-                    : "Invalid phone number format. Ensure the number starts with '+' and contains 10 to 15 digits.";
-
+            String errorMessage = messageService.getLocalizedMessage("invalid_phone_number_format", languageCode);
             messageService.sendMessage(chatId, errorMessage);
             return;
         }
 
-        // Сообщение для подтверждения изменения
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Вы хотите сменить номер телефона на: " + newPhoneNumber + "?"
-                : "uk".equals(languageCode)
-                ? "Ви хочете змінити номер телефону на: " + newPhoneNumber + "?"
-                : "Do you want to change your phone number to: " + newPhoneNumber + "?";
+        // Confirmation message for phone number change
+        String confirmationMessage = messageService.getLocalizedMessage("confirm_phone_number_change", languageCode);
+        confirmationMessage = String.format(confirmationMessage, newPhoneNumber);
 
-        // Создаем inline-кнопки для подтверждения или отмены
+        // Create inline buttons for confirmation or cancellation
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
 
-        // Кнопка "Да"
+        // "Yes" button for confirming the phone number change
         InlineKeyboardButton yesButton = new InlineKeyboardButton();
-        yesButton.setText("ru".equals(languageCode) ? "Да" : "uk".equals(languageCode) ? "Так" : "Yes");
+        yesButton.setText(messageService.getLocalizedMessage("yes", languageCode));
         yesButton.setCallbackData("/confirm_change_phone_number_" + newPhoneNumber);
 
-        // Кнопка "Нет"
+        // "No" button for cancelling the phone number change
         InlineKeyboardButton noButton = new InlineKeyboardButton();
-        noButton.setText("ru".equals(languageCode) ? "Нет" : "uk".equals(languageCode) ? "Ні" : "No");
+        noButton.setText(messageService.getLocalizedMessage("no", languageCode));
         noButton.setCallbackData("/cancel_change_phone_number");
 
         rowsInline.add(List.of(yesButton, noButton));
         inlineKeyboardMarkup.setKeyboard(rowsInline);
 
-        // Отправляем сообщение с подтверждением
+        // Send the confirmation message with inline keyboard
         messageService.sendMessageWithInlineKeyboard(chatId, confirmationMessage, inlineKeyboardMarkup);
         userSession.setCurrentState(chatId, "/settings");
     }
 
     protected void confirmChangePhoneNumber(Long chatId, String newPhoneNumber) {
-        // Обновляем номер телефона в базе данных
+        // Update the phone number in the database
         userRepository.updatePhoneNumberByChatId(chatId, newPhoneNumber);
 
-        // Сообщение об успешном изменении
+        // Get the language code of the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-        String successMessage = "ru".equals(languageCode)
-                ? "Номер телефона успешно изменен на: " + newPhoneNumber
-                : "uk".equals(languageCode)
-                ? "Номер телефону успішно змінено на: " + newPhoneNumber
-                : "Phone number successfully changed to: " + newPhoneNumber;
 
+        // Localized success message for phone number change
+        String successMessage = messageService.getLocalizedMessage("phone_number_change_success", languageCode);
+        successMessage = String.format(successMessage, newPhoneNumber);
+
+        // Send the success message
         messageService.sendMessage(chatId, successMessage);
+
+        // Update user session state
         userSession.setCurrentState(chatId, "/settings");
-        // Возвращаемся в главное меню настроек
-        menuService.handleSettingsCommand(chatId, messageService);
+
+        // Return to the settings menu
+        menuService.handleSettingsCommand(chatId);
     }
 
-    protected void cancelChangePhoneNumber(Long chatId) {
+    public void cancelChangePhoneNumber(Long chatId) {
+        // Get the language code of the user
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Сообщение об отмене изменения номера
-        String cancelMessage = "ru".equals(languageCode)
-                ? "Изменение номера телефона отменено."
-                : "uk".equals(languageCode)
-                ? "Зміна номера телефону скасована."
-                : "Phone number change canceled.";
+        // Localized cancellation message
+        String cancelMessage = messageService.getLocalizedMessage("phone_number_change_cancelled", languageCode);
 
+        // Send the cancellation message
         messageService.sendMessage(chatId, cancelMessage);
 
-        // Возвращаемся в главное меню настроек
+        // Update user session state
         userSession.setCurrentState(chatId, "/settings");
-        menuService.handleSettingsCommand(chatId, messageService);
+
+        // Return to the settings menu
+        menuService.handleSettingsCommand(chatId);
     }
 
     public void initialWriteToAdmin(Long chatId, Long adminChatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Получаем информацию об администраторе
+        // Get information about the admin
         Users admin = userRepository.findByChatId(adminChatId);
         if (admin == null) {
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/main_menu");
-            messageService.sendMessageWithInlineKeyboard(chatId,"Admin not found with ID: " + adminChatId, autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            messageService.sendMessageWithInlineKeyboard(chatId,
+                    messageService.getLocalizedMessage("admin_not_found", languageCode, adminChatId),
+                    autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            return;
         }
 
-        // Сообщение пользователю
-        String message = "ru".equals(languageCode)
-                ? "Напишите сообщение администратору: " + admin.getFirstName()
-                : "uk".equals(languageCode)
-                ? "Напишіть повідомлення адміністратору: " + admin.getFirstName()
-                : "Write a message to the admin: " + admin.getFirstName();
-
+        // Localized message for the user
+        String message = messageService.getLocalizedMessage("write_message_to_admin", languageCode) + " " + admin.getFirstName();
         messageService.sendMessage(chatId, message);
 
-        // Устанавливаем состояние для чата
+        // Set the session state for writing to admin
         userSession.setCurrentState(chatId, "/writing_to_admin_from_user_" + adminChatId);
         userSession.setPreviousState(chatId, "/main_menu");
     }
@@ -1338,24 +1202,19 @@ public class UserService {
         if (users == null) {
             userSession.clearStates(masterChatId);
             userSession.setCurrentState(masterChatId, "/main_menu");
-            messageService.sendMessage(masterChatId, "User not found with chat ID: " + masterChatId);
+            messageService.sendMessage(masterChatId, messageService.getLocalizedMessage("user_not_found", languageCode));
+            return;
         }
 
-        // Формируем сообщение для администратора
-        String messageToAdmin = "ru".equals(adminLanguageCode)
-                ? "Вам написал пользователь:\n" + users.getFirstName() + "\n" + users.getLastName() + "\n\nСообщение:\n" + messageText
-                : "uk".equals(adminLanguageCode)
-                ? "Вам написав користувач:\n" + users.getFirstName() + "\n" + users.getLastName() + "\n\nПовідомлення:\n" + messageText
-                : "A user wrote to you:\n" + users.getFirstName() + "\n" + users.getLastName() + "\n\nMessage:\n" + messageText;
+        // Формируем сообщение для администратора с использованием локализации
+        String messageToAdmin = messageService.getLocalizedMessage("message_to_admin", adminLanguageCode) + "\n"
+                + users.getFirstName() + " " + users.getLastName() + "\n\n"
+                + messageService.getLocalizedMessage("message_from_user", adminLanguageCode) + "\n" + messageText;
 
         // Создаем клавиатуру с кнопкой "Ответить"
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton replyButton = new InlineKeyboardButton();
-        replyButton.setText("ru".equals(adminLanguageCode)
-                ? "Ответить"
-                : "uk".equals(adminLanguageCode)
-                ? "Відповісти"
-                : "Reply");
+        replyButton.setText(messageService.getLocalizedMessage("reply_button", adminLanguageCode));
         replyButton.setCallbackData("/write_user_" + masterChatId);
 
         keyboard.setKeyboard(List.of(List.of(replyButton)));
@@ -1364,11 +1223,7 @@ public class UserService {
         messageService.sendMessageWithInlineKeyboard(adminChatId, messageToAdmin, keyboard);
 
         // Подтверждаем мастеру отправку сообщения
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Ваше сообщение отправлено администратору."
-                : "uk".equals(languageCode)
-                ? "Ваше повідомлення надіслано адміністратору."
-                : "Your message has been sent to the admin.";
+        String confirmationMessage = messageService.getLocalizedMessage("message_sent_confirmation", languageCode);
 
         // Очищаем состояние чата мастера
         userSession.clearStates(masterChatId);
@@ -1380,20 +1235,19 @@ public class UserService {
     public void initialWriteToMaster(Long chatId, Long masterChatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
 
-        // Получаем информацию об администраторе
+        // Получаем информацию о мастере
         Users master = userRepository.findByChatId(masterChatId);
         if (master == null) {
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/main_menu");
-            messageService.sendMessageWithInlineKeyboard(chatId,"Master not found with ID: " + masterChatId, autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            messageService.sendMessageWithInlineKeyboard(chatId,
+                    messageService.getLocalizedMessage("master_not_found", languageCode) + masterChatId,
+                    autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            return;
         }
 
         // Сообщение пользователю
-        String message = "ru".equals(languageCode)
-                ? "Напишите сообщение администратору: " + master.getFirstName()
-                : "uk".equals(languageCode)
-                ? "Напишіть повідомлення адміністратору: " + master.getFirstName()
-                : "Write a message to the admin: " + master.getFirstName();
+        String message = messageService.getLocalizedMessage("write_to_master", languageCode) + " " + master.getFirstName();
 
         messageService.sendMessage(chatId, message);
 
@@ -1403,48 +1257,38 @@ public class UserService {
     }
 
     public void writeToMaster(Long chatId, Long masterChatId, String messageText) {
-        String languageCode = userRepository.findLanguageCodeByChatId(masterChatId);
-        String masterLanguageCode = userRepository.findLanguageCodeByChatId(masterChatId);
+        String languageCode = userRepository.findLanguageCodeByChatId(chatId); // For the user
+        String masterLanguageCode = userRepository.findLanguageCodeByChatId(masterChatId); // For the master
 
         Users users = userRepository.findByChatId(chatId);
         if (users == null) {
             userSession.clearStates(masterChatId);
             userSession.setCurrentState(masterChatId, "/main_menu");
-            messageService.sendMessage(masterChatId, "User not found with chat ID: " + masterChatId);
+            messageService.sendMessage(masterChatId, "User not found with chat ID: " + chatId);
+            return;
         }
 
-        String messageToAdmin = "ru".equals(masterLanguageCode)
-                ? "Вам написал пользователь:\n" + users.getFirstName() + "\n" + users.getLastName() + "\n\nСообщение:\n" + messageText
-                : "uk".equals(masterLanguageCode)
-                ? "Вам написав користувач:\n" + users.getFirstName() + "\n" + users.getLastName() + "\n\nПовідомлення:\n" + messageText
-                : "A user wrote to you:\n" + users.getFirstName() + "\n" + users.getLastName() + "\n\nMessage:\n" + messageText;
+        // Prepare the message for the master using localized strings
+        String messageToMaster = messageService.getLocalizedMessage("user_wrote_to_you", masterLanguageCode) + "\n" +
+                users.getFirstName() + "\n" + users.getLastName() + "\n\n" +
+                messageService.getLocalizedMessage("message", masterLanguageCode) + ":\n" + messageText;
 
-        // Создаем клавиатуру с кнопкой "Ответить"
+        // Create keyboard with "Reply" button
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         InlineKeyboardButton replyButton = new InlineKeyboardButton();
-        replyButton.setText("ru".equals(masterLanguageCode)
-                ? "Ответить"
-                : "uk".equals(masterLanguageCode)
-                ? "Відповісти"
-                : "Reply");
+        replyButton.setText(messageService.getLocalizedMessage("reply", masterLanguageCode));
         replyButton.setCallbackData("/message_client_" + chatId);
 
         keyboard.setKeyboard(List.of(List.of(replyButton)));
 
-        messageService.sendMessageWithInlineKeyboard(masterChatId, messageToAdmin, keyboard);
+        // Send the message to the master
+        messageService.sendMessageWithInlineKeyboard(masterChatId, messageToMaster, keyboard);
 
-        // Подтверждаем мастеру отправку сообщения
-        String confirmationMessage = "ru".equals(languageCode)
-                ? "Ваше сообщение отправлено администратору."
-                : "uk".equals(languageCode)
-                ? "Ваше повідомлення надіслано адміністратору."
-                : "Your message has been sent to the admin.";
-
-        // Очищаем состояние чата мастера
+        // Send confirmation to the user that the message was sent
+        String confirmationMessage = messageService.getLocalizedMessage("message_sent_to_master", languageCode);
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/main_menu");
 
         messageService.sendMessageWithInlineKeyboard(chatId, confirmationMessage, autUserButtons.getAuthenticatedInlineKeyboard(chatId));
     }
-
 }

@@ -28,18 +28,14 @@ public class NotificationService {
 
     private final AppointmentRepository appointmentRepository;
     private final MessageService messageService;
-    private final MasterRepository masterRepository;
-    private final UserSession userSession;
     private final UserRepository userRepository;
 
     private Clock clock = Clock.systemDefaultZone();
 
     @Autowired
-    public NotificationService(AppointmentRepository appointmentRepository, MessageService messageService, MasterRepository masterRepository, UserSession userSession, UserRepository userRepository) {
+    public NotificationService(AppointmentRepository appointmentRepository, MessageService messageService, UserRepository userRepository) {
         this.appointmentRepository = appointmentRepository;
         this.messageService = messageService;
-        this.masterRepository = masterRepository;
-        this.userSession = userSession;
         this.userRepository = userRepository;
     }
 
@@ -60,21 +56,13 @@ public class NotificationService {
 
             // Проверка за день до сеанса (в пределах от 23 до 24 часов до встречи)
             if (ChronoUnit.HOURS.between(now, appointmentTime) >= 23 && ChronoUnit.HOURS.between(now, appointmentTime) < 24) {
-                String message = "ru".equals(languageCode)
-                        ? "Напоминание: Ваша запись назначена на завтра."
-                        : "uk".equals(languageCode)
-                        ? "Нагадування: Ваш запис призначений на завтра."
-                        : "Reminder: Your appointment is scheduled for tomorrow.";
+                String message = messageService.getLocalizedMessage("appointment_reminder_tomorrow", languageCode);
                 notifyClientAndMaster(appointment, message);
             }
 
             // Проверка за три часа до сеанса (в пределах от 2 до 3 часов до встречи)
             if (ChronoUnit.HOURS.between(now, appointmentTime) >= 2 && ChronoUnit.HOURS.between(now, appointmentTime) < 3) {
-                String message = "ru".equals(languageCode)
-                        ? "Напоминание: Ваша запись через 3 часа."
-                        : "uk".equals(languageCode)
-                        ? "Нагадування: Ваш запис через 3 години."
-                        : "Reminder: Your appointment is in 3 hours.";
+                String message = messageService.getLocalizedMessage("appointment_reminder_3hours", languageCode);
                 notifyClientAndMaster(appointment, message);
             }
         }
@@ -105,42 +93,52 @@ public class NotificationService {
     }
 
     private String getLocalizedClientMessage(String languageCode, Appointment appointment) {
-        String localizedMessage = "\nMaster: " + appointment.getMaster().getName() +
-                "\nService: " + appointment.getServices().getNameEn() +
-                "\nDate: " + appointment.getAppointmentDate().toLocalDate() +
-                "\nTime: " + appointment.getAppointmentDate().toLocalTime();
+        // Получаем локализованные сообщения для разных языков
+        String masterLabel = messageService.getLocalizedMessage("appointment.master", languageCode);
+        String serviceLabel = messageService.getLocalizedMessage("appointment.service", languageCode);
+        String dateLabel = messageService.getLocalizedMessage("appointment.date", languageCode);
+        String timeLabel = messageService.getLocalizedMessage("appointment.time", languageCode);
 
+        // Формируем сообщение
+        String localizedMessage = String.format("%s: %s\n%s: %s\n%s: %s\n%s: %s",
+                masterLabel, appointment.getMaster().getName(),
+                serviceLabel, appointment.getServices().getNameEn(), // Default in English
+                dateLabel, appointment.getAppointmentDate().toLocalDate(),
+                timeLabel, appointment.getAppointmentDate().toLocalTime());
+
+        // Применяем локализацию для услуг в зависимости от языка
         if ("ru".equals(languageCode)) {
-            localizedMessage = "\nМастер: " + appointment.getMaster().getName() +
-                    "\nУслуга: " + appointment.getServices().getNameRu() +
-                    "\nДата: " + appointment.getAppointmentDate().toLocalDate() +
-                    "\nВремя: " + appointment.getAppointmentDate().toLocalTime();
+            localizedMessage = localizedMessage.replace(appointment.getServices().getNameEn(),
+                    appointment.getServices().getNameRu());
         } else if ("uk".equals(languageCode)) {
-            localizedMessage = "\nМайстер: " + appointment.getMaster().getName() +
-                    "\nПослуга: " + appointment.getServices().getNameUk() +
-                    "\nДата: " + appointment.getAppointmentDate().toLocalDate() +
-                    "\nЧас: " + appointment.getAppointmentDate().toLocalTime();
+            localizedMessage = localizedMessage.replace(appointment.getServices().getNameEn(),
+                    appointment.getServices().getNameUk());
         }
 
         return localizedMessage;
     }
 
     private String getLocalizedMasterMessage(String languageCode, Appointment appointment) {
-        String localizedMessage = "\nClient: " + appointment.getUsers().getFirstName() + " " + appointment.getUsers().getLastName() +
-                "\nService: " + appointment.getServices().getNameEn() +
-                "\nDate: " + appointment.getAppointmentDate().toLocalDate() +
-                "\nTime: " + appointment.getAppointmentDate().toLocalTime();
+        // Получаем локализованные сообщения для разных языков
+        String clientLabel = messageService.getLocalizedMessage("appointment.client", languageCode);
+        String serviceLabel = messageService.getLocalizedMessage("appointment.service", languageCode);
+        String dateLabel = messageService.getLocalizedMessage("appointment.date", languageCode);
+        String timeLabel = messageService.getLocalizedMessage("appointment.time", languageCode);
 
+        // Формируем сообщение
+        String localizedMessage = String.format("%s: %s %s\n%s: %s\n%s: %s\n%s: %s",
+                clientLabel, appointment.getUsers().getFirstName(), appointment.getUsers().getLastName(),
+                serviceLabel, appointment.getServices().getNameEn(), // Default in English
+                dateLabel, appointment.getAppointmentDate().toLocalDate(),
+                timeLabel, appointment.getAppointmentDate().toLocalTime());
+
+        // Применяем локализацию для услуги в зависимости от языка
         if ("ru".equals(languageCode)) {
-            localizedMessage = "\nКлиент: " + appointment.getUsers().getFirstName() + " " + appointment.getUsers().getLastName() +
-                    "\nУслуга: " + appointment.getServices().getNameRu() +
-                    "\nДата: " + appointment.getAppointmentDate().toLocalDate() +
-                    "\nВремя: " + appointment.getAppointmentDate().toLocalTime();
+            localizedMessage = localizedMessage.replace(appointment.getServices().getNameEn(),
+                    appointment.getServices().getNameRu());
         } else if ("uk".equals(languageCode)) {
-            localizedMessage = "\nКлієнт: " + appointment.getUsers().getFirstName() + " " + appointment.getUsers().getLastName() +
-                    "\nПослуга: " + appointment.getServices().getNameUk() +
-                    "\nДата: " + appointment.getAppointmentDate().toLocalDate() +
-                    "\nЧас: " + appointment.getAppointmentDate().toLocalTime();
+            localizedMessage = localizedMessage.replace(appointment.getServices().getNameEn(),
+                    appointment.getServices().getNameUk());
         }
 
         return localizedMessage;
@@ -155,27 +153,26 @@ public class NotificationService {
         for (Appointment appointment : appointments) {
             LocalDateTime appointmentEndTime = appointment.getAppointmentDate();
 
-            // Check if the appointment ended more than three hours ago
+            // Check if the appointment ended more than five hours ago
             long hoursSinceAppointment = ChronoUnit.HOURS.between(appointmentEndTime, now);
-            if (hoursSinceAppointment >= 5 && appointment.getStatus() != Appointment.Status.COMPLETED) {
-                // Mark appointment as completed
+            if (hoursSinceAppointment >= 5 && !appointment.getStatus().equals(Appointment.Status.COMPLETED)) {
+                // Mark appointment as completed if not already marked
                 appointment.setStatus(Appointment.Status.COMPLETED);
                 appointmentRepository.save(appointment);
 
                 // Request feedback and rating from the client
                 Users client = appointment.getUsers();
                 if (client != null && client.getChatId() != null) {
-                    String languageCode = userRepository.findLanguageCodeByChatId(client.getChatId());  // Получаем язык клиента
+                    String languageCode = userRepository.findLanguageCodeByChatId(client.getChatId());  // Get client language
 
                     // Form the feedback request based on the client's language
-                    String feedbackRequest = getLocalizedFeedbackRequest(languageCode, appointment);
+                    String feedbackRequest = messageService.getLocalizedMessage("appointment.completed.feedback_request", languageCode, appointment.getServices().getNameEn(), appointment.getMaster().getName());
 
                     InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
                     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
                     InlineKeyboardButton reviewButton = new InlineKeyboardButton(
-                            "ru".equals(languageCode) ? "Оставить отзыв" :
-                                    "uk".equals(languageCode) ? "Залишити відгук" : "Review Appointment"
+                            messageService.getLocalizedMessage("review_button", languageCode) // Use localized button label
                     );
                     reviewButton.setCallbackData("/confirm_review_" + appointment.getId());
                     rows.add(List.of(reviewButton));
@@ -186,24 +183,6 @@ public class NotificationService {
                 }
             }
         }
-    }
-
-    private String getLocalizedFeedbackRequest(String languageCode, Appointment appointment) {
-        String feedbackRequest = "Your appointment for " + appointment.getServices().getNameEn() +
-                " with " + appointment.getMaster().getName() + " has been completed. We would love to hear your feedback!\n" +
-                "Please rate the service from 1 to 5 and leave a comment.";
-
-        if ("ru".equals(languageCode)) {
-            feedbackRequest = "Ваша запись на услугу " + appointment.getServices().getNameRu() +
-                    " с мастером " + appointment.getMaster().getName() + " завершена. Мы будем рады услышать ваш отзыв!\n" +
-                    "Пожалуйста, оцените услугу от 1 до 5 и оставьте комментарий.";
-        } else if ("uk".equals(languageCode)) {
-            feedbackRequest = "Ваш запис на послугу " + appointment.getServices().getNameUk() +
-                    " з майстром " + appointment.getMaster().getName() + " завершено. Ми будемо раді почути ваш відгук!\n" +
-                    "Будь ласка, оцініть послугу від 1 до 5 і залиште коментар.";
-        }
-
-        return feedbackRequest;
     }
 
 }

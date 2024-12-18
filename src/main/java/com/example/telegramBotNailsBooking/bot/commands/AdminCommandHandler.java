@@ -69,11 +69,6 @@ public class AdminCommandHandler extends AdminService {
     @Autowired
     private ReviewService reviewService;
 
-    @Autowired
-    private AppointmentRepository appointmentRepository;
-    @Autowired
-    private TimeSlotRepository timeSlotRepository;
-
     public void handleAdminCommand(Long chatId, String text) {
 
         logger.info("Received command: {} for chat ID {}", text, chatId);
@@ -93,7 +88,7 @@ public class AdminCommandHandler extends AdminService {
         }
 
 
-        if (currentState == "/select_master") {
+        if (currentState.equals("/select_master")) {
             handleAdminCommand(chatId, "/select_master");
             return;
         }
@@ -119,7 +114,7 @@ public class AdminCommandHandler extends AdminService {
         }
 
         if (userSession.getDateInfo(chatId) != null) {
-            if (userSession.getPreviousState(chatId) == "/add_date") {
+            if (userSession.getPreviousState(chatId).equals("/add_date")) {
                 availableDateService.handleAddDateInput(chatId, text);
                 return;
             } else {
@@ -129,7 +124,7 @@ public class AdminCommandHandler extends AdminService {
         }
 
         if (userSession.getTimeInfo(chatId) != null) {
-            if (userSession.getPreviousState(chatId) == "/add_time") {
+            if (userSession.getPreviousState(chatId).equals("/add_time")) {
                 availableDateService.handleAddTimeInput(chatId, text);
                 return;
             } else {
@@ -139,7 +134,7 @@ public class AdminCommandHandler extends AdminService {
         }
 
         if (userSession.getServiceInfo(chatId) != null) {
-            if (userSession.getPreviousState(chatId) == "/add_service") {
+            if (userSession.getPreviousState(chatId).equals("/add_service")) {
                 serviceManagementService.handleAddService(chatId, text);
                 return;
             } else {
@@ -168,12 +163,7 @@ public class AdminCommandHandler extends AdminService {
                 messageService.sendMessage(chatId, serviceName + ": " + serviceDescription);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Описание услуги не найдено."
-                                : "uk".equals(languageCode)
-                                ? "Опис послуги не знайдено."
-                                : "Service description not found.");
+                messageService.sendLocalizedMessage(chatId, "service.description.not.found", languageCode);
                 return;
             }
         }
@@ -184,12 +174,7 @@ public class AdminCommandHandler extends AdminService {
                 String[] parts = text.replace("/show_times_", "").split("_");
 
                 if (parts.length < 2) {
-                    messageService.sendMessage(chatId,
-                            "ru".equals(languageCode)
-                                    ? "Неверный формат команды. Пожалуйста, попробуйте снова."
-                                    : "uk".equals(languageCode)
-                                    ? "Неправильний формат команди. Будь ласка, спробуйте ще раз."
-                                    : "Invalid command format. Please try again.");
+                    messageService.sendLocalizedMessage(chatId, "command.format.invalid", languageCode);
                     return;
                 }
 
@@ -200,20 +185,10 @@ public class AdminCommandHandler extends AdminService {
                 appointmentService.showTimeSlotsForDate(chatId, date, status);
                 return;
             } catch (DateTimeParseException e) {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Неверный формат даты. Пожалуйста, попробуйте снова."
-                                : "uk".equals(languageCode)
-                                ? "Неправильний формат дати. Будь ласка, спробуйте ще раз."
-                                : "Invalid date format. Please try again.");
+                messageService.sendLocalizedMessage(chatId, "invalid.date.format", languageCode);
                 return;
             } catch (IllegalArgumentException e) {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Неверный формат статуса. Пожалуйста, попробуйте снова."
-                                : "uk".equals(languageCode)
-                                ? "Неправильний формат статусу. Будь ласка, спробуйте ще раз."
-                                : "Invalid status format. Please try again.");
+                messageService.sendLocalizedMessage(chatId, "invalid.status.format", languageCode);
                 return;
             }
         }
@@ -224,12 +199,7 @@ public class AdminCommandHandler extends AdminService {
                 appointmentService.cancelAppointment(chatId, appointmentId);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Пожалуйста, выберите дату и время для отмены записи."
-                                : "uk".equals(languageCode)
-                                ? "Будь ласка, оберіть дату та час для скасування запису."
-                                : "Please choose date and time for canceling the appointment.");
+                messageService.sendLocalizedMessage(chatId, "select.date.time.cancel", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -241,12 +211,7 @@ public class AdminCommandHandler extends AdminService {
                 userSession.setCurrentState(chatId, "/book_info");
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Ваша запись не была перенесена."
-                                : "uk".equals(languageCode)
-                                ? "Ваш запис не було перенесено."
-                                : "Your appointment was not transferred.");
+                messageService.sendLocalizedMessage(chatId, "appointment.not.transferred", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             } else if (userSession.getCurrentState(chatId).startsWith("/confirm_cancel_")) {
@@ -254,12 +219,7 @@ public class AdminCommandHandler extends AdminService {
                 userSession.setCurrentState(chatId, "/book_info");
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Ваша запись не была отменена."
-                                : "uk".equals(languageCode)
-                                ? "Ваш запис не було скасовано."
-                                : "Your appointment was not canceled.");
+                messageService.sendLocalizedMessage(chatId, "appointment.not.canceled", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             } else if (userSession.getCurrentState(chatId).startsWith("/confirm_delete_")) {
@@ -267,12 +227,7 @@ public class AdminCommandHandler extends AdminService {
                 userSession.setCurrentState(chatId, "/book_info");
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Ваша запись не была удалена."
-                                : "uk".equals(languageCode)
-                                ? "Ваш запис не було видалено."
-                                : "Your appointment was not deleted.");
+                messageService.sendLocalizedMessage(chatId, "appointment.not.deleted", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             } else if (userSession.getCurrentState(chatId).startsWith("/confirm_review_")) {
@@ -280,12 +235,7 @@ public class AdminCommandHandler extends AdminService {
                 userSession.setCurrentState(chatId, "/book_info");
                 userSession.setPreviousState(chatId, "/book_service");
                 userSession.clearSession(chatId);
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Мы с нетерпением ждем вашего отзыва в будущем."
-                                : "uk".equals(languageCode)
-                                ? "Ми з нетерпінням чекаємо на ваш відгук у майбутньому."
-                                : "We look forward to your review in the future.");
+                messageService.sendLocalizedMessage(chatId, "review.not.submitted", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -298,12 +248,7 @@ public class AdminCommandHandler extends AdminService {
                 appointmentService.transferAppointment(chatId, appointmentId);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Пожалуйста, выберите дату и время для переноса записи."
-                                : "uk".equals(languageCode)
-                                ? "Будь ласка, оберіть дату та час для перенесення запису."
-                                : "Please choose a date and time for transferring the appointment.");
+                messageService.sendLocalizedMessage(chatId, "appointment.transfer.choose.date.time", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -343,12 +288,7 @@ public class AdminCommandHandler extends AdminService {
                 appointmentService.finalizeTransfer(chatId, appointmentId, timeSlotId);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Пожалуйста, выберите дату и время для переноса записи."
-                                : "uk".equals(languageCode)
-                                ? "Будь ласка, оберіть дату та час для перенесення запису."
-                                : "Please choose date and time for transferring the appointment.");
+                messageService.sendLocalizedMessage(chatId, "appointment.transfer.choose.date.time", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -369,12 +309,7 @@ public class AdminCommandHandler extends AdminService {
                 appointmentService.deleteAppointment(chatId, appointmentId);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Пожалуйста, выберите дату и время для удаления записи."
-                                : "uk".equals(languageCode)
-                                ? "Будь ласка, оберіть дату та час для видалення запису."
-                                : "Please choose date and time for deleting the appointment.");
+                messageService.sendLocalizedMessage(chatId, "appointment.delete.choose.date.time", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
@@ -395,18 +330,13 @@ public class AdminCommandHandler extends AdminService {
                 reviewService.askMarkAndFeedback(chatId, appointmentId);
                 return;
             } else {
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Пожалуйста, выберите дату и время для просмотра записи."
-                                : "uk".equals(languageCode)
-                                ? "Будь ласка, оберіть дату та час для перегляду запису."
-                                : "Please choose date and time for reviewing the appointment.");
+                messageService.sendLocalizedMessage(chatId, "appointment.review.choose.date.time", languageCode);
                 autUserButtons.showBookingInfoMenu(chatId);
                 return;
             }
         }
 
-        if (userSession.getCurrentState(chatId) == "/waiting_for_rating_") {
+        if (userSession.getCurrentState(chatId).equals("/waiting_for_rating_")) {
             int rating = Integer.parseInt(text);
             reviewService.requestComment(chatId, rating);
             return;
@@ -583,9 +513,9 @@ public class AdminCommandHandler extends AdminService {
             return;
         }
 
-        if (text.equals("/cancel_appointment")) {
+        if (text.equals("/admin_cancel_appointment")) {
             userSession.clearStates(chatId);
-            userSession.setCurrentState(chatId, "/cancel_appointment");
+            userSession.setCurrentState(chatId, "/admin_cancel_appointment");
             userSession.setPreviousState(chatId, "/appointments_manage");
 
             adminChooseClient(chatId, "CANCEL");
@@ -702,25 +632,18 @@ public class AdminCommandHandler extends AdminService {
             userSession.setCurrentState(chatId, "/add_appointment");
             userSession.setPreviousState(chatId, "/other_actions");
 
-            String message = "ru".equals(languageCode)
-                    ? "Введите номер телефона клиента:" :
-                    "uk".equals(languageCode)
-                            ? "Введіть номер телефону клієнта:" :
-                            "Enter the client's phone number:";
+            // Получаем локализованное сообщение и текст кнопки
+            String cancelText = messageService.getLocalizedMessage("button.cancel", languageCode);
 
             // Отправляем сообщение с кнопкой "Отмена"
             InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
             List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-            InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                    "ru".equals(languageCode) ? "Отмена" :
-                            "uk".equals(languageCode) ? "Скасувати" :
-                                    "Cancel"
-            );
+            InlineKeyboardButton cancelButton = new InlineKeyboardButton(cancelText);
             cancelButton.setCallbackData("/admin_cancel_appointment");
             rows.add(List.of(cancelButton));
             keyboard.setKeyboard(rows);
 
-            messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+            messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "appointment.enter.phone", languageCode, keyboard);
             return;
         }
 
@@ -733,37 +656,24 @@ public class AdminCommandHandler extends AdminService {
                 userSession.setCurrentState(chatId, "/admin_select_master");
                 userSession.setTempData(chatId, "userId", String.valueOf(existingUser.getId()));
 
-                String message = "ru".equals(languageCode)
-                        ? "Клиент найден. Выберите мастера для записи:" :
-                        "uk".equals(languageCode)
-                                ? "Клієнт знайдений. Оберіть майстра для запису:" :
-                                "Client found. Choose a master for the appointment:";
-                messageService.sendMessage(chatId, message);
+                // Локализованное сообщение
+                messageService.sendLocalizedMessage(chatId, "client.found.select.master", languageCode);
                 showMasterSelection(chatId);
             } else {
                 // Клиент не найден
                 userSession.setCurrentState(chatId, "/add_new_client");
                 userSession.setTempData(chatId, "phone", phoneNumber);
 
-                String message = "ru".equals(languageCode)
-                        ? "Клиент не найден. Введите имя клиента:" :
-                        "uk".equals(languageCode)
-                                ? "Клієнт не знайдений. Введіть ім'я клієнта:" :
-                                "Client not found. Enter the client's first name:";
-
-                // Отправляем сообщение с кнопкой "Отмена"
+                // Локализованное сообщение
+                String cancelText = messageService.getLocalizedMessage("button.cancel", languageCode);
                 InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
                 List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-                InlineKeyboardButton cancelButton = new InlineKeyboardButton(
-                        "ru".equals(languageCode) ? "Отмена" :
-                                "uk".equals(languageCode) ? "Скасувати" :
-                                        "Cancel"
-                );
+                InlineKeyboardButton cancelButton = new InlineKeyboardButton(cancelText);
                 cancelButton.setCallbackData("/admin_cancel_appointment");
                 rows.add(List.of(cancelButton));
                 keyboard.setKeyboard(rows);
 
-                messageService.sendMessageWithInlineKeyboard(chatId, message, keyboard);
+                messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "client.not.found.enter.first.name", languageCode, keyboard);
             }
             return;
         }
@@ -772,15 +682,8 @@ public class AdminCommandHandler extends AdminService {
         if (text.equals("/admin_cancel_appointment")) {
             userSession.clearStates(chatId);
             userSession.setCurrentState(chatId, "/other_actions");
-
-            String message = "ru".equals(languageCode)
-                    ? "Процесс записи отменен." :
-                    "uk".equals(languageCode)
-                            ? "Процес запису скасовано." :
-                            "Appointment process canceled.";
-
-            // Возвращаемся в меню управления записями
-            messageService.sendMessageWithInlineKeyboard(chatId, message, adminButtons.getManageAppointmentsKeyboard(chatId));
+            // Отправка сообщения с клавиатурой
+            messageService.sendLocalizedMessageWithInlineKeyboard(chatId, "appointment.process.canceled", languageCode, adminButtons.getManageAppointmentsKeyboard(chatId));
             return;
         }
 
@@ -789,12 +692,9 @@ public class AdminCommandHandler extends AdminService {
             userSession.setTempData(chatId, "firstName", firstName);
 
             userSession.setCurrentState(chatId, "/add_new_client_last_name");
-            String message = "ru".equals(languageCode)
-                    ? "Введите фамилию клиента:" :
-                    "uk".equals(languageCode)
-                            ? "Введіть прізвище клієнта:" :
-                            "Enter the client's last name:";
-            messageService.sendMessage(chatId, message);
+
+            // Отправляем локализованное сообщение
+            messageService.sendLocalizedMessage(chatId, "client.enter.last.name", languageCode);
             return;
         }
 
@@ -815,12 +715,8 @@ public class AdminCommandHandler extends AdminService {
             userSession.setCurrentState(chatId, "/admin_select_master");
             userSession.setTempData(chatId, "userId", String.valueOf(newUser.getId()));
 
-            String message = "ru".equals(languageCode)
-                    ? "Новый клиент добавлен" :
-                    "uk".equals(languageCode)
-                            ? "Новий клієнт доданий." :
-                            "New client added.";
-            messageService.sendMessage(chatId, message);
+            // Отправка локализованного сообщения о добавлении клиента
+            messageService.sendLocalizedMessage(chatId, "client.added.success", languageCode);
             showMasterSelection(chatId);
             return;
         }
@@ -898,23 +794,23 @@ public class AdminCommandHandler extends AdminService {
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/manage_appointments");
                 userSession.setPreviousState(chatId, "/other_actions");
-                messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode)
-                                ? "Выберите действие:"
-                                : "uk".equals(languageCode)
-                                ? "Оберіть дію:"
-                                : "Choose an action:",
-                        adminButtons.getManageAppointmentsKeyboard(chatId));
+                messageService.sendLocalizedMessageWithInlineKeyboard(
+                        chatId,
+                        "action.choose",
+                        languageCode,
+                        adminButtons.getManageAppointmentsKeyboard(chatId)
+                );
                 break;
             case "/other_actions":
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/other_actions");
                 userSession.setPreviousState(chatId, "/admin");
-                messageService.sendMessageWithInlineKeyboard(chatId, "ru".equals(languageCode)
-                                ? "Выберите действие:"
-                                : "uk".equals(languageCode)
-                                ? "Оберіть дію:"
-                                : "Choose an action:",
-                        adminButtons.getOtherActionsInlineKeyboard(chatId));
+                messageService.sendLocalizedMessageWithInlineKeyboard(
+                        chatId,
+                        "action.choose",
+                        languageCode,
+                        adminButtons.getOtherActionsInlineKeyboard(chatId)
+                );
                 break;
             case "/manage_masters":
                 masterService.showMasterManagementMenu(chatId);
@@ -952,17 +848,16 @@ public class AdminCommandHandler extends AdminService {
                 userSession.clearStates(chatId);
                 userSession.setCurrentState(chatId, "/book_service");
                 userSession.setPreviousState(chatId, "/menu");
-                menuService.bookingManagerButton(chatId, messageService);
+                menuService.bookingManagerButton(chatId);
                 break;
             case "/book":
                 appointmentService.startBooking(chatId);
-                messageService.sendMessageWithInlineKeyboard(chatId,
-                        "ru".equals(languageCode)
-                                ? "Вы можете отменить эту операцию, используя кнопку ниже."
-                                : "uk".equals(languageCode)
-                                ? "Ви можете скасувати цю операцію, використовуючи кнопку нижче."
-                                : "You can cancel this operation using the button below.",
-                        autUserButtons.getCancelInlineKeyboard(chatId));
+                messageService.sendLocalizedMessageWithInlineKeyboard(
+                        chatId,
+                        "operation.cancel.info",
+                        languageCode,
+                        autUserButtons.getCancelInlineKeyboard(chatId)
+                );
                 break;
             case "/confirm_appointment":
                 // Proceed with the actual booking creation
@@ -971,13 +866,8 @@ public class AdminCommandHandler extends AdminService {
 
             case "/cancel_appointment":
                 userSession.clearBookingInfo(chatId);
-                messageService.sendMessage(chatId,
-                        "ru".equals(languageCode)
-                                ? "Бронирование было отменено."
-                                : "uk".equals(languageCode)
-                                ? "Бронювання було скасовано."
-                                : "Booking has been canceled.");
-                menuService.bookingManagerButton(chatId, messageService);
+                messageService.sendLocalizedMessage(chatId, "booking.canceled", languageCode);
+                menuService.bookingManagerButton(chatId);
                 break;
             case "/select_master":
                 appointmentService.selectMaster(chatId);
@@ -1021,18 +911,17 @@ public class AdminCommandHandler extends AdminService {
             case "/menu":
                 userSession.setCurrentState(chatId, "/menu");
                 userSession.setPreviousState(chatId, "/main_menu");
-                messageService.sendMessageWithInlineKeyboard(chatId,
-                        "ru".equals(languageCode)
-                                ? "Вот ваше меню:"
-                                : "uk".equals(languageCode)
-                                ? "Ось ваше меню:"
-                                : "Here is your menu:",
-                        menuService.getMenuInlineKeyboard(chatId));
+                messageService.sendLocalizedMessageWithInlineKeyboard(
+                        chatId,
+                        "menu.title",
+                        languageCode,
+                        menuService.getMenuInlineKeyboard(chatId)
+                );
                 break;
             case "/settings":
                 userSession.setCurrentState(chatId, "/settings");
                 userSession.setPreviousState(chatId, "/menu");
-                menuService.handleSettingsCommand(chatId, messageService);
+                menuService.handleSettingsCommand(chatId);
                 break;
             case "/date":
                 userSession.clearStates(chatId);
@@ -1072,43 +961,44 @@ public class AdminCommandHandler extends AdminService {
                 break;
             default:
                 if (text.contains("/")) {
-                    messageService.sendMessage(chatId,
-                            "ru".equals(languageCode)
-                                    ? "Извините, команда не распознана. Введите /help для просмотра доступных команд."
-                                    : "uk".equals(languageCode)
-                                    ? "Вибачте, команду не розпізнано. Введіть /help для перегляду доступних команд."
-                                    : "Sorry, command was not recognized. Type /help for available commands.");
+                    messageService.sendLocalizedMessage(
+                            chatId,
+                            "command.not.recognized",
+                            languageCode
+                    );
                     break;
                 }
 
                 if (userSession.getPreviousState(chatId) != null) {
                     // Переходим к предыдущему состоянию
                     handleAdminCommand(chatId, userSession.getPreviousState(chatId));
+                    break;
                 } else {
                     // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-                    messageService.sendMessageWithInlineKeyboard(chatId,
-                            "ru".equals(languageCode)
-                                    ? "Предыдущего состояния не найдено. Возвращение в главное меню."
-                                    : "uk".equals(languageCode)
-                                    ? "Попередній стан не знайдено. Повернення до головного меню."
-                                    : "No previous state found. Returning to the main menu.",
-                            autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+                    userSession.clearStates(chatId);
+                    userSession.setPreviousState(chatId, "/main_menu");
+                    userSession.setCurrentState(chatId, "/main_menu");
+                    messageService.sendLocalizedMessageWithInlineKeyboard(
+                            chatId,
+                            "previous.state.not.found",
+                            languageCode,
+                            autUserButtons.getAuthenticatedInlineKeyboard(chatId)
+                    );
                 }
                 break;
         }
     }
 
-    void mainMenu(Long chatId) {
+    public void mainMenu(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
         userSession.clearStates(chatId);
         userSession.setCurrentState(chatId, "/main_menu");
-        messageService.sendMessageWithInlineKeyboard(chatId,
-                "ru".equals(languageCode)
-                        ? "Главное меню"
-                        : "uk".equals(languageCode)
-                        ? "Головне меню"
-                        : "Main Menu",
-                autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+        messageService.sendLocalizedMessageWithInlineKeyboard(
+                chatId,
+                "main.menu",
+                languageCode,
+                autUserButtons.getAuthenticatedInlineKeyboard(chatId)
+        );
     }
 
     private void goBack(Long chatId) {
@@ -1122,25 +1012,21 @@ public class AdminCommandHandler extends AdminService {
             handleAdminCommand(chatId, previousState);
         } else {
             // Если предыдущее состояние отсутствует, возвращаем пользователя в главное меню
-            messageService.sendMessageWithInlineKeyboard(chatId,
-                    "ru".equals(languageCode)
-                            ? "Предыдущее состояние не найдено. Возвращаемся в главное меню."
-                            : "uk".equals(languageCode)
-                            ? "Попередній стан не знайдено. Повертаємося до головного меню."
-                            : "No previous state found. Returning to the main menu.",
-                    autUserButtons.getAuthenticatedInlineKeyboard(chatId));
+            messageService.sendLocalizedMessageWithInlineKeyboard(
+                    chatId,
+                    "previous.state.not.found",
+                    languageCode,
+                    autUserButtons.getAuthenticatedInlineKeyboard(chatId)
+            );
         }
     }
 
     public void cancel(Long chatId) {
         String languageCode = userRepository.findLanguageCodeByChatId(chatId);
-        String currentState = userSession.getCurrentState(chatId); // Получаем предыдущее состояние
-        messageService.sendMessage(chatId,
-                "ru".equals(languageCode)
-                        ? "Текущая операция была отменена."
-                        : "uk".equals(languageCode)
-                        ? "Поточну операцію було скасовано."
-                        : "Current operation has been cancelled.");
+        String currentState = userSession.getCurrentState(chatId);
+
+        // Отправка локализованного сообщения
+        messageService.sendLocalizedMessage(chatId, "operation.cancelled", languageCode);
 
         if (currentState != null) {
             // Если предыдущее состояние существует, возвращаемся к нему и устанавливаем его как текущее
@@ -1153,8 +1039,7 @@ public class AdminCommandHandler extends AdminService {
             mainMenu(chatId);
         }
 
-        // После возврата очищаем текущие данные сессии, чтобы сбросить состояние
+        // Очищаем текущие данные сессии
         userSession.clearSession(chatId);
     }
-
 }
