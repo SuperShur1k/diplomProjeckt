@@ -26,7 +26,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/TelegramBotNailsBooking
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: 123671189Sasha
-      BOT_TOKEN: "7620720012:AAGXBdShOB8tjtSMdbNLkbx0bQd0LElVkMs"
+      BOT_TOKEN: 
     depends_on:
       mysql-db:
         condition: service_healthy
